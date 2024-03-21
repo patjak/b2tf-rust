@@ -22,4 +22,11 @@ impl Log {
 
         Ok(())
     }
+
+    pub fn save(&self) -> Result<(), Box<dyn Error>> {
+        let contents = format!("{}\n---\n{}", self.config, self.commits);
+        fs::write(&self.filename, contents)?;
+
+        Ok(())
+    }
 }
