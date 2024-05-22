@@ -1,5 +1,7 @@
 mod log;
+mod cli;
 use crate::log::*;
+use crate::cli::*;
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -8,6 +10,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         config: String::from(""),
         commits: String::from("")
     };
+
+    let options = Cli::parse_command_line();
 
     log.load()?;
 
