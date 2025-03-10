@@ -43,9 +43,31 @@ impl Options {
         if !signature.is_none() { self.signature = signature }
         if !references.is_none() { self.references = references }
     }
+
+    pub fn parse(&mut self, matches :&ArgMatches, log :&Log) -> Result<(), Box<dyn Error>> {
+        // TODO: Check the users global config file
+
+        // Check the local config file
+        log.parse_config(self)?;
+
+        // Parse options from cli
+        self.parse_matches(&matches);
+
+        // println!("debug is {}", matches.get_flag("debug"));
+
+        Ok(())
+    }
 }
 
-fn parse_options(matches :&ArgMatches, log :&Log) -> Result<Options, Box<dyn Error>> {
+fn main() -> Result<(), Box<dyn Error>> {
+    let mut log = Log {
+        filename: String::from("commits.log"),
+        config: String::from(""),
+        commits: String::from("")
+    };
+
+    log.load()?;
+    let matches = Cli::parse_command_line();
     let mut options = Options {
         range_start: None,
         range_stop:  None,
@@ -58,29 +80,7 @@ fn parse_options(matches :&ArgMatches, log :&Log) -> Result<Options, Box<dyn Err
         references: None,
     };
 
-    // Check the local config file
-    log.parse_config(&mut options)?;
-
-    // Parse options from cli
-    options.parse_matches(&matches);
-
-    // println!("debug is {}", matches.get_flag("debug"));
-
-    // Then check the users global config file
-
-    Ok(options)
-}
-
-fn main() -> Result<(), Box<dyn Error>> {
-    let mut log = Log {
-        filename: String::from("commits.log"),
-        config: String::from(""),
-        commits: String::from("")
-    };
-
-    log.load()?;
-    let matches = Cli::parse_command_line();
-    let options = parse_options(&matches, &log)?;
+    options.parse(&matches, &log)?;
     println!("{:?}", options);
 
     if let Some(_matches) = matches.subcommand_matches("export") {
