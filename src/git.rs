@@ -28,4 +28,10 @@ impl Git {
 
         Ok(())
     }
+
+    pub fn change_branch(branch: &String, dir: &String) -> Result<(), Box<dyn Error>> {
+        Git::cmd(format!("checkout {}", branch), dir)?;
+
+        Ok(())
+    }
 }
