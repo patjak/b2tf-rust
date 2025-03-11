@@ -67,7 +67,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     log.load()?;
-    let matches = Cli::parse_command_line();
+    let matches = Cli::parse();
     let mut options = Options {
         range_start: None,
         range_stop:  None,

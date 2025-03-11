@@ -4,8 +4,7 @@ pub struct Cli {
 }
 
 impl Cli {
-    pub fn parse_command_line() -> ArgMatches {
-        // Start by looking at the command line
+    pub fn parse() -> ArgMatches {
         let matches = command!()
             .name("Back 2 The Future")
             .display_name("display name")
