@@ -1,12 +1,13 @@
 mod log;
 mod cli;
 mod commands;
+mod git;
 use crate::log::*;
 use crate::cli::*;
+use crate::commands::*;
 use clap::{ArgMatches};
 use std::fmt::Debug;
 use std::error::Error;
-use crate::commands::*;
 
 #[derive(Debug)]
 pub struct Options {
