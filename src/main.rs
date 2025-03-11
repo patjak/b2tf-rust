@@ -53,8 +53,6 @@ impl Options {
         // Parse options from cli
         self.parse_matches(&matches);
 
-        // println!("debug is {}", matches.get_flag("debug"));
-
         Ok(())
     }
 }
@@ -81,7 +79,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     options.parse(&matches, &log)?;
-    // println!("{:?}", options);
+
+    if matches.get_flag("debug") {
+        println!("Options: {:?}", options);
+    }
 
     if let Some(_matches) = matches.subcommand_matches("populate") {
         cmd_populate(&options, &mut log)?;
