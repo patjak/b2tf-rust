@@ -81,10 +81,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     options.parse(&matches, &log)?;
-    println!("{:?}", options);
+    // println!("{:?}", options);
 
-    if let Some(_matches) = matches.subcommand_matches("export") {
-        cmd_export(&options);
+    if let Some(_matches) = matches.subcommand_matches("populate") {
+        cmd_populate(&options, &mut log)?;
     }
 
     Ok(())

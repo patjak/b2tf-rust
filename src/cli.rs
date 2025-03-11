@@ -42,7 +42,7 @@ impl Cli {
             )
 
             .subcommand(
-                Command::new("export")
+                Command::new("populate")
                     .about("populate the commits list from commits inside range")
             )
             .subcommand(
