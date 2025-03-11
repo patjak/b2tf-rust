@@ -75,4 +75,32 @@ impl Log {
 
         Ok(())
     }
+
+    // Returns the next commit to apply
+    pub fn commit_next(&self) -> Result<&str, Box<dyn Error>> {
+        let lines: Vec<&str> = self.commits.split("\n").collect();
+        let mut hash: &str = "";
+
+        for line in lines.iter() {
+            let line = line.trim();
+
+            if line.len() == 0 {
+                continue;
+            }
+            if &line[0..1] == "#" {
+                continue;
+            }
+
+            let rows: Vec<&str> = line.split(" ").collect();
+            if rows.len() >= 2 {
+                continue;
+            }
+            if rows[0].len() != 40 {
+                continue;
+            }
+            hash = rows[0];
+            break;
+        }
+        Ok(hash)
+    }
 }
