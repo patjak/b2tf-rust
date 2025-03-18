@@ -4,6 +4,7 @@ use std::error::Error;
 use crate::cli::*;
 use crate::Options;
 
+#[derive(Debug, Clone)]
 pub struct Log {
     pub filename: String,
     pub config: String,
@@ -76,31 +77,88 @@ impl Log {
         Ok(())
     }
 
+    // Update backport id for upstream id in the log
+    pub fn commit_update(&mut self, upstream_id: &str, backport_id: &str) -> Result<(), Box<dyn Error>> {
+        let lines: Vec<&str> = self.commits.split("\n").collect();
+        let mut commits = String::from("");
+
+        for line in lines.iter() {
+            let cols: Vec<&str> = line.trim().split(" ").collect();
+
+            if cols.len() == 1 && cols[0] == upstream_id {
+                commits.push_str(upstream_id);
+                commits.push_str(" ");
+                commits.push_str(backport_id);
+                commits.push_str("\n");
+            } else {
+                commits.push_str(line);
+                commits.push_str("\n");
+            }
+        }
+        self.commits = commits;
+        self.save()?;
+        Ok(())
+    }
+
     // Returns the next commit to apply
-    pub fn commit_next(&self) -> Result<&str, Box<dyn Error>> {
+    pub fn next_commit(&self) -> &str {
         let lines: Vec<&str> = self.commits.split("\n").collect();
         let mut hash: &str = "";
 
         for line in lines.iter() {
+            hash = "";
             let line = line.trim();
 
-            if line.len() == 0 {
-                continue;
-            }
-            if &line[0..1] == "#" {
-                continue;
-            }
+            if line.len() == 0 { continue; }
+            if &line[0..1] == "#" { continue; }
 
             let rows: Vec<&str> = line.split(" ").collect();
-            if rows.len() >= 2 {
-                continue;
-            }
-            if rows[0].len() != 40 {
-                continue;
-            }
+            if rows.len() >= 2 { continue; }
+            if rows[0].len() != 40 { continue; }
+
             hash = rows[0];
+
             break;
         }
-        Ok(hash)
+        hash
+    }
+
+    // Returns the index of the next commit to apply
+    pub fn next_index(&self) -> u32 {
+        let lines: Vec<&str> = self.commits.split("\n").collect();
+        let mut i: u32 = 0;
+
+        for line in lines.iter() {
+            let line = line.trim();
+
+            if line.len() == 0 { continue; }
+            if &line[0..1] == "#" { continue; }
+
+            let rows: Vec<&str> = line.split(" ").collect();
+            i += 1;
+            if rows.len() >= 2 { continue; }
+            if rows[0].len() != 40 { continue; }
+
+            break;
+        }
+        i
+    }
+
+    // Return the number of commits in the list
+    pub fn num_commits(&self) -> Result<u32, Box<dyn Error>> {
+        let lines: Vec<&str> = self.commits.split("\n").collect();
+
+        let mut num: u32 = 0;
+
+        for line in lines.iter() {
+            if line.trim() == "" { continue; }
+
+            let cols: Vec<&str> = line.split(" ").collect();
+            if cols[0] == "#" { continue; }
+
+            if cols[0].len() == 40 { num += 1; }
+        }
+
+        Ok(num)
     }
 }

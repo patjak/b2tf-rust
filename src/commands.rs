@@ -2,6 +2,7 @@ use std::process::Command;
 use std::error::Error;
 use crate::Options;
 use crate::Log;
+use crate::git::Git;
 
 pub fn cmd_populate(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
     let git_dir = options.git_dir.clone().unwrap();
@@ -16,7 +17,6 @@ pub fn cmd_populate(options: &Options, log: &mut Log) -> Result<(), Box<dyn Erro
         .arg(&query)
         .output()
         .expect(format!("Failed to execute: {}\n", &query).as_str());
-
 
     if !output.status.success() {
         return Err("Failed to execute git rev-list".into());
@@ -43,4 +43,29 @@ pub fn cmd_populate(options: &Options, log: &mut Log) -> Result<(), Box<dyn Erro
     log.save()?;
 
     Ok(())
+}
+
+pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
+    let git_dir = options.git_dir.clone().unwrap();
+    let branch = options.branch.clone().unwrap();
+
+    let log_read = log.clone();
+    let mut i: u32 = log_read.next_index();
+    let num_commits = log_read.num_commits().unwrap();
+
+    Git::cmd(format!("checkout {}", branch), &git_dir)?;
+
+    loop {
+        let log_read = log.clone();
+        let next_hash = log_read.next_commit();
+        let commit = Git::log(&next_hash, &git_dir)?;
+
+        println!("Applying {}/{}: {} {}", i, num_commits, next_hash, commit.subject);
+
+        Git::cmd(format!("cherry-pick {}", next_hash), &git_dir)?;
+        let new_hash = Git::cmd(format!("log --format='%H' -n 1"), &git_dir)?;
+
+        log.commit_update(next_hash, new_hash.trim())?;
+        i += 1;
+    }
 }

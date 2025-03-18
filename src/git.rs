@@ -2,12 +2,18 @@ use std::process::Command;
 use std::error::Error;
 
 #[derive(Debug)]
+pub struct Commit {
+    pub hash: String,
+    pub subject: String,
+}
+
+#[derive(Debug)]
 pub struct Git {
     pub dir:    Option<String>,
 }
 
 impl Git {
-    pub fn cmd(query: String, dir: &String) -> Result<(), Box<dyn Error>> {
+    pub fn cmd(query: String, dir: &String) -> Result<String, Box<dyn Error>> {
 
         let query = format!("git -C {} {}", dir, query);
 
@@ -17,21 +23,30 @@ impl Git {
             .output()
             .expect(format!("Failed to execute: {}\n", &query).as_str());
 
+        let stdout = String::from_utf8(output.stdout).expect("Invalid UTF8");
+
         if !output.status.success() {
-            return Err(format!("git cmd failed. Query: git -C {} {}", dir, query).into());
-        } else {
-            println!("{}", query);
+            println!("{}", stdout);
+
+            return Err(format!("Failed: {}", query).into());
         }
 
-        let stdout = String::from_utf8(output.stdout).expect("Invalid UTF8");
-        println!("{}", stdout);
-
-        Ok(())
+        Ok(stdout)
     }
 
-    pub fn change_branch(branch: &String, dir: &String) -> Result<(), Box<dyn Error>> {
-        Git::cmd(format!("checkout {}", branch), dir)?;
+    pub fn log(hash: &str, dir: &String) -> Result<Commit, Box<dyn Error>>{
 
-        Ok(())
+        let mut commit = Commit {
+            hash: "".to_string(),
+            subject: "".to_string(),
+        };
+
+        let stdout: &str = &Git::cmd(format!("log --format='%H%n%s' -n1 {}", hash), dir).unwrap();
+        let lines: Vec<&str> = stdout.split("\n").collect();
+
+        commit.hash = lines[0].trim().to_string();
+        commit.subject = lines[1].trim().to_string();
+
+        return Ok(commit);
     }
 }
