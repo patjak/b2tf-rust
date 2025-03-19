@@ -49,4 +49,23 @@ impl Git {
 
         return Ok(commit);
     }
+
+    pub fn get_branch(dir: &String) -> Result<String, Box<dyn Error>> {
+        let stdout: &str = &Git::cmd("branch --show-current".to_string(), dir)?;
+        let branch = stdout.to_string();
+
+        Ok(branch)
+    }
+
+    pub fn set_branch(branch: &String, dir: &String) -> Result<(), Box<dyn Error>> {
+        let current_branch = Git::get_branch(dir)?;
+
+        if current_branch.trim() == *branch {
+            return Ok(())
+        }
+
+        Git::cmd(format!("checkout {branch}"), dir)?;
+
+        Ok(())
+    }
 }

@@ -53,7 +53,7 @@ pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>>
     let mut i: u32 = log_read.next_index();
     let num_commits = log_read.num_commits().unwrap();
 
-    Git::cmd(format!("checkout {}", branch), &git_dir)?;
+    Git::set_branch(&branch, &git_dir)?;
 
     loop {
         let log_read = log.clone();
@@ -76,7 +76,7 @@ pub fn cmd_status(options: &Options, log: &Log) -> Result<(), Box<dyn Error>> {
     let paths = options.paths.clone().unwrap();
     let range_stop = options.range_stop.clone().unwrap();
 
-    Git::cmd(format!("checkout {}", branch), &git_dir)?;
+    Git::set_branch(&branch, &git_dir)?;
 
     let next_index = log.next_index();
     let num_commits = log.num_commits().unwrap();
