@@ -69,3 +69,25 @@ pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>>
         i += 1;
     }
 }
+
+pub fn cmd_status(options: &Options, log: &Log) -> Result<(), Box<dyn Error>> {
+    let git_dir = options.git_dir.clone().unwrap();
+    let branch = options.branch.clone().unwrap();
+    let paths = options.paths.clone().unwrap();
+    let range_stop = options.range_stop.clone().unwrap();
+
+    Git::cmd(format!("checkout {}", branch), &git_dir)?;
+
+    let next_index = log.next_index();
+    let num_commits = log.num_commits().unwrap();
+    let percentage = (next_index / num_commits) * 100;
+    println!("Progress {}% ({}/{})", percentage, next_index, num_commits);
+
+    let stdout = Git::cmd(format!("diff --stat {branch} {range_stop} -- {paths}"), &git_dir).unwrap();
+    let lines: Vec<&str> = stdout.split("\n").collect();
+    let summary = lines[lines.len() - 2].trim();
+
+    println!("{summary}");
+
+    Ok(())
+}

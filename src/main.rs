@@ -89,6 +89,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         cmd_populate(&options, &mut log)?;
     } else if let Some(_matches) = matches.subcommand_matches("apply") {
         cmd_apply(&options, &mut log)?;
+    } else if let Some(_matches) = matches.subcommand_matches("status") {
+        cmd_status(&options, &log)?;
     }
 
     Ok(())
