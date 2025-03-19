@@ -2,7 +2,7 @@ use std::process::Command;
 use std::error::Error;
 use crate::Options;
 use crate::Log;
-use crate::git::Git;
+use crate::git::{Git, GitSession};
 
 pub fn cmd_populate(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
     let git_dir = options.git_dir.clone().unwrap();
@@ -55,6 +55,12 @@ pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>>
 
     Git::set_branch(&branch, &git_dir)?;
 
+    let session = Git::get_session(&git_dir)?;
+
+    if session != GitSession::NONE {
+        return Err("In session".into());
+    }
+
     loop {
         let log_read = log.clone();
         let next_hash = log_read.next_commit();
@@ -88,6 +94,14 @@ pub fn cmd_status(options: &Options, log: &Log) -> Result<(), Box<dyn Error>> {
     let summary = lines[lines.len() - 2].trim();
 
     println!("{summary}");
+
+    let session = Git::get_session(&git_dir).unwrap();
+
+    match session {
+        GitSession::CHERRYPICK => println!("Session: Cherry-picking"),
+        GitSession::REBASE => println!("Session: Rebasing"),
+        GitSession::NONE => println!("No session"),
+    }
 
     Ok(())
 }

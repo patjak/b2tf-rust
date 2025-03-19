@@ -7,12 +7,18 @@ pub struct Commit {
     pub subject: String,
 }
 
-#[derive(Debug)]
 pub struct Git {
-    pub dir:    Option<String>,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum GitSession {
+    NONE,
+    REBASE,
+    CHERRYPICK,
 }
 
 impl Git {
+    // Execute query in git repository located at dir
     pub fn cmd(query: String, dir: &String) -> Result<String, Box<dyn Error>> {
 
         let query = format!("git -C {} {}", dir, query);
@@ -34,14 +40,14 @@ impl Git {
         Ok(stdout)
     }
 
-    pub fn log(hash: &str, dir: &String) -> Result<Commit, Box<dyn Error>>{
+    pub fn log(hash: &str, dir: &String) -> Result<Commit, Box<dyn Error>> {
 
         let mut commit = Commit {
             hash: "".to_string(),
             subject: "".to_string(),
         };
 
-        let stdout: &str = &Git::cmd(format!("log --format='%H%n%s' -n1 {}", hash), dir).unwrap();
+        let stdout: &str = &Git::cmd(format!("log --format='%H%n%s' -n1 {}", hash), dir)?;
         let lines: Vec<&str> = stdout.split("\n").collect();
 
         commit.hash = lines[0].trim().to_string();
@@ -67,5 +73,18 @@ impl Git {
         Git::cmd(format!("checkout {branch}"), dir)?;
 
         Ok(())
+    }
+
+    pub fn get_session(dir: &String) -> Result<GitSession, Box<dyn Error>> {
+        let stdout: &str = &Git::cmd("status".to_string(), dir).unwrap();
+        let lines: Vec<&str> = stdout.split("\n").collect();
+
+        if lines[0].trim() == "interactive rebase in progress" {
+            return Ok(GitSession::REBASE);
+        } else if lines[1][..39].trim() == "You are currently cherry-picking commit" {
+            return Ok(GitSession::CHERRYPICK);
+        }
+
+        Ok(GitSession::NONE)
     }
 }
