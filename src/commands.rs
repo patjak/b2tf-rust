@@ -1,5 +1,6 @@
 use std::process::Command;
 use std::error::Error;
+use colored::Colorize;
 use crate::Options;
 use crate::Log;
 use crate::git::{Git, GitSession};
@@ -98,8 +99,8 @@ pub fn cmd_status(options: &Options, log: &Log) -> Result<(), Box<dyn Error>> {
     let session = Git::get_session(&git_dir).unwrap();
 
     match session {
-        GitSession::CHERRYPICK => println!("Session: Cherry-picking"),
-        GitSession::REBASE => println!("Session: Rebasing"),
+        GitSession::CHERRYPICK => println!("{}", "Session: Cherry-picking".yellow()),
+        GitSession::REBASE => println!("{}", "Session: Rebasing\n".yellow()),
         GitSession::NONE => println!("No session"),
     }
 
