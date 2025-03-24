@@ -81,7 +81,7 @@ impl Git {
 
         if lines[0].trim() == "interactive rebase in progress" {
             return Ok(GitSession::REBASE);
-        } else if lines[1][..39].trim() == "You are currently cherry-picking commit" {
+        } else if lines[1].len() > 39 && lines[1][..39].trim() == "You are currently cherry-picking commit" {
             return Ok(GitSession::CHERRYPICK);
         }
 
