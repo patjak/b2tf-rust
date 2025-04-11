@@ -87,4 +87,45 @@ impl Git {
 
         Ok(GitSession::NONE)
     }
+
+    pub fn parse_session_paths(dir: &String, typestr: &str) -> Result<Vec<(String, String)>, Box<dyn Error>> {
+        let stdout: &str = &Git::cmd("status".to_string(), dir)?;
+        let sections: Vec<&str> = stdout.split(typestr).collect();
+        let mut paths: Vec<(String, String)> = Vec::new();
+
+        if sections.len() != 2 {
+            return Ok(paths);
+        }
+
+        let lines: Vec<&str> = sections[1].split("\n").collect();
+
+        for line in lines.iter() {
+            let col: Vec<&str> = line.split(":").collect();
+
+            if col.len() == 2 {
+                let path_type: String = col[0].trim().to_string();
+                let path: String = col[1].trim().to_string();
+                paths.push((path_type, path));
+            }
+
+            // Skip invalid lines while paths is empty, then break on first invalid line
+            if col.len() == 1 && col[0] == ""  && paths.len() > 0 {
+                break;
+            }
+        }
+
+        Ok(paths)
+    }
+
+    pub fn get_unmerged_paths(dir: &String) -> Result<Vec<(String, String)>, Box<dyn Error>> {
+        Git::parse_session_paths(&dir, "Unmerged paths:")
+    }
+
+    pub fn get_modified_paths(dir: &String) -> Result<Vec<(String, String)>, Box<dyn Error>> {
+        Git::parse_session_paths(&dir, "Changes to be committed:")
+    }
+
+    pub fn get_unstaged_paths(dir: &String) -> Result<Vec<(String, String)>, Box<dyn Error>> {
+        Git::parse_session_paths(&dir, "Changes not staged for commit:")
+    }
 }
