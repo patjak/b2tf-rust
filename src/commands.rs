@@ -4,6 +4,7 @@ use std::path::Path;
 use colored::Colorize;
 use crate::Options;
 use crate::Log;
+use crate::Util;
 use crate::git::{Git, GitSession};
 
 pub fn cmd_populate(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
