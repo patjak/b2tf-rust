@@ -153,7 +153,7 @@ pub fn cmd_status(options: &Options, log: &Log) -> Result<(), Box<dyn Error>> {
     let lines: Vec<&str> = stdout.split("\n").collect();
     let summary = lines[lines.len() - 2].trim();
 
-    println!("{summary}");
+    println!("{summary}\n");
 
     let session = Git::get_session(&git_dir).unwrap();
 
@@ -162,6 +162,34 @@ pub fn cmd_status(options: &Options, log: &Log) -> Result<(), Box<dyn Error>> {
         GitSession::REBASE => println!("{}", "Session: Rebasing\n".yellow()),
         GitSession::NONE => println!("No session"),
     }
+
+
+    let unmerged_paths = Git::get_unmerged_paths(&git_dir)?;
+    let modified_paths = Git::get_modified_paths(&git_dir)?;
+    let unstaged_paths = Git::get_unstaged_paths(&git_dir)?;
+
+    if modified_paths.len() > 0 {
+        println!("\nChanges to be committed:");
+        for path in modified_paths.iter() {
+            println!("\t{}", path.1.green());
+        }
+    }
+
+    if unmerged_paths.len() > 0 {
+        println!("\nUnmerged paths:");
+        for path in unmerged_paths.iter() {
+            println!("\t{}", path.1.red());
+        }
+    }
+
+    if unstaged_paths.len() > 0 {
+        println!("\nChanges not staged for commit:");
+        for path in unstaged_paths.iter() {
+            println!("\t{}", path.1.red());
+        }
+    }
+
+    println!("");
 
     Ok(())
 }
