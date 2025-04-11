@@ -54,6 +54,10 @@ impl Cli {
                     .about("skip current commit")
             )
             .subcommand(
+                Command::new("edit")
+                    .about("edit the current conflict")
+            )
+            .subcommand(
                 Command::new("restart")
                     .about("delete your branch and restart the entire backport")
             )

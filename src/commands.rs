@@ -1,5 +1,6 @@
 use std::process::Command;
 use std::error::Error;
+use std::path::Path;
 use colored::Colorize;
 use crate::Options;
 use crate::Log;
@@ -75,6 +76,63 @@ pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>>
         log.commit_update(next_hash, new_hash.trim())?;
         i += 1;
     }
+}
+
+// Returns the line number of the first occurance of '<<<<<<<' in file
+fn find_conflict_lineno(file: String) -> Result<String, Box<dyn Error>> {
+    let output = Command::new("sh")
+        .arg("-c")
+        .arg(format!("grep -n '<<<<<<<' {}", file))
+        .output()
+        .expect("Failed to grep for conflict line");
+
+    if !output.status.success() {
+        return Err("Failed to grep conflict line".into());
+    }
+
+    let stdout = String::from_utf8(output.stdout).expect("Invalid UTF8");
+    let line: Vec<&str> = stdout.split(":").collect();
+    let lineno: String = line[0].to_string();
+
+    Ok(lineno)
+}
+
+pub fn cmd_edit(options: &Options, log: &Log) -> Result<(), Box<dyn Error>> {
+    let git_dir = options.git_dir.clone().unwrap();
+    let range_stop = options.range_stop.clone().unwrap();
+    let unmerged_paths = Git::get_unmerged_paths(&git_dir)?;
+    let commit = log.next_commit();
+
+    for path in unmerged_paths.iter() {
+        let file = &path.1;
+        let file_path = Path::new(file);
+        let commit_file = format!("/tmp/{}.patch", commit);
+        let target_file = format!("/tmp/{}-{}", range_stop, file_path.file_name().unwrap().to_str().unwrap());
+
+        // Store the commit as a patch file
+        Git::cmd(format!("show {} > {}", commit, commit_file), &git_dir);
+
+        // Store the target version of the file (eg git show v5.5:<filepath>)
+        Git::cmd(format!("show {}:{} > {}", range_stop, file, target_file), &git_dir);
+
+        // Find the line number where to start editing
+        let lineno = find_conflict_lineno(format!("{}/{}", git_dir, file)).unwrap();
+
+        // FIXME: Add support for other editors than vim
+        Command::new("sh")
+            .arg("-c")
+            .arg(format!("cd {git_dir} && vim {commit_file} -c 'vs {target_file} | {lineno}' -c 'vs {file} | {lineno}'"))
+            .status()
+            .expect("Failed to open editor");
+
+        Command::new("sh")
+            .arg("-c")
+            .arg(format!("rm {commit_file} && rm {target_file}"))
+            .status()
+            .expect("Failed to remove temporary files");
+    }
+
+    Ok(())
 }
 
 pub fn cmd_status(options: &Options, log: &Log) -> Result<(), Box<dyn Error>> {
