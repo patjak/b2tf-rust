@@ -56,6 +56,15 @@ impl Git {
         return Ok(commit);
     }
 
+    pub fn get_last_commit(dir: &String) -> Result<String, Box<dyn Error>> {
+        let res = Git::cmd(format!("log --format='%H' -n 1"), &dir);
+
+        match res {
+            Ok(commit) => return Ok(commit.trim().to_string()),
+            Err(error) => return Err(error),
+        };
+    }
+
     pub fn get_branch(dir: &String) -> Result<String, Box<dyn Error>> {
         let stdout: &str = &Git::cmd("branch --show-current".to_string(), dir)?;
         let branch = stdout.to_string();
