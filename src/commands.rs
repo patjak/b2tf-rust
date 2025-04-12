@@ -118,14 +118,19 @@ pub fn cmd_edit(options: &Options, log: &Log) -> Result<(), Box<dyn Error>> {
         let commit_file = format!("/tmp/{}.patch", commit);
         let target_file = format!("/tmp/{}-{}", range_stop, file_path.file_name().unwrap().to_str().unwrap());
 
-        // Store the commit as a patch file
-        Git::cmd(format!("show {} > {}", commit, commit_file), &git_dir);
-
-        // Store the target version of the file (eg git show v5.5:<filepath>)
-        Git::cmd(format!("show {}:{} > {}", range_stop, file, target_file), &git_dir);
+        let val = Util::ask(format!("Edit {} (Y)es/(n)o)? ", file.bold()), vec!["y", "n"], "y");
+        if val == "n" {
+            continue;
+        }
 
         // Find the line number where to start editing
-        let lineno = find_conflict_lineno(format!("{}/{}", git_dir, file)).unwrap();
+        let lineno = find_conflict_lineno(format!("{}/{}", git_dir, file))?;
+
+        // Store the commit as a patch file
+        Git::cmd(format!("show {} > {}", commit, commit_file), &git_dir)?;
+
+        // Store the target version of the file (eg git show v5.5:<filepath>)
+        Git::cmd(format!("show {}:{} > {}", range_stop, file, target_file), &git_dir)?;
 
         // FIXME: Add support for other editors than vim
         Command::new("sh")
@@ -139,6 +144,21 @@ pub fn cmd_edit(options: &Options, log: &Log) -> Result<(), Box<dyn Error>> {
             .arg(format!("rm {commit_file} && rm {target_file}"))
             .status()
             .expect("Failed to remove temporary files");
+
+        // Check lineno again to see if all conflicts are solved
+        let lineno = find_conflict_lineno(format!("{}/{}", git_dir, file))?;
+        if lineno == "0" {
+            Git::cmd(format!("add {file}"), &git_dir)?;
+        } else {
+            println!("{}", "File still contains conflics!".red());
+        }
+    }
+    let unmerged_paths = Git::get_unmerged_paths(&git_dir)?;
+
+    if unmerged_paths.len() == 0 {
+        println!("All conflicts fixed. Run 'apply' to continue.");
+    } else {
+        println!("Not all conflicts are fixed. Run 'edit' to fix them.");
     }
 
     Ok(())
