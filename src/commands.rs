@@ -51,7 +51,8 @@ pub fn cmd_populate(options: &Options, log: &mut Log) -> Result<(), Box<dyn Erro
 pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
     let git_dir = options.git_dir.clone().unwrap();
     let branch = options.branch.clone().unwrap();
-
+    let modified_paths = Git::get_modified_paths(&git_dir)?;
+    let unmerged_paths = Git::get_unmerged_paths(&git_dir)?;
     let log_read = log.clone();
     let mut i: u32 = log_read.next_index();
     let num_commits = log_read.num_commits().unwrap();
@@ -60,7 +61,28 @@ pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>>
 
     let session = Git::get_session(&git_dir)?;
 
-    if session != GitSession::NONE {
+    if session == GitSession::CHERRYPICK {
+        // Check for empty commit
+        if unmerged_paths.len() == 0 && modified_paths.len() == 0 {
+            let next_commit = log_read.next_commit();
+            Git::cmd("cherry-pick --abort".to_string(), &git_dir)?;
+            log.commit_update(next_commit, "empty")?;
+        }
+
+        // Check if all conflicts are resolved so we can update log and continue
+        if unmerged_paths.len() == 0 && modified_paths.len() > 0 {
+            let next_commit = log_read.next_commit();
+            Git::cmd("cherry-pick --continue".to_string(), &git_dir)?;
+            let new_commit = Git::get_last_commit(&git_dir)?;
+            log.commit_update(next_commit, &new_commit)?;
+        }
+
+        if unmerged_paths.len() > 0 {
+            print_session(&git_dir)?;
+            println!("\nNot all conflicts are fixed. Run 'edit' to fix them.");
+            return Ok(());
+        }
+    } else if session != GitSession::NONE {
         return Err("In session".into());
     }
 
