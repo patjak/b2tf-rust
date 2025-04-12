@@ -71,13 +71,47 @@ pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>>
 
         println!("Applying {}/{}: {} {}", i, num_commits, next_hash, commit.subject);
 
-        Git::cmd(format!("cherry-pick {}", next_hash), &git_dir)?;
-        let new_hash = Git::cmd(format!("log --format='%H' -n 1"), &git_dir)?;
+        let res = Git::cmd(format!("cherry-pick {}", next_hash), &git_dir);
+        match res {
+            Ok(_) => (),
+            Err(_) => return cmd_edit(&options, &log),
+        }
+        let new_hash = Git::get_last_commit(&git_dir)?;
 
         log.commit_update(next_hash, new_hash.trim())?;
         i += 1;
     }
 }
+
+pub fn print_session(git_dir: &String) -> Result<(), Box<dyn Error>> {
+    let unmerged_paths = Git::get_unmerged_paths(&git_dir)?;
+    let modified_paths = Git::get_modified_paths(&git_dir)?;
+    let unstaged_paths = Git::get_unstaged_paths(&git_dir)?;
+
+    if modified_paths.len() > 0 {
+        println!("\nChanges to be committed:");
+        for path in modified_paths.iter() {
+            println!("\t{}", path.1.green());
+        }
+    }
+
+    if unmerged_paths.len() > 0 {
+        println!("\nUnmerged paths:");
+        for path in unmerged_paths.iter() {
+            println!("\t{}", path.1.red());
+        }
+    }
+
+    if unstaged_paths.len() > 0 {
+        println!("\nChanges not staged for commit:");
+        for path in unstaged_paths.iter() {
+            println!("\t{}", path.1.red());
+        }
+    }
+
+    Ok(())
+}
+
 
 // Returns the line number of the first occurance of '<<<<<<<' in file
 fn find_conflict_lineno(file: String) -> Result<String, Box<dyn Error>> {
@@ -104,13 +138,7 @@ pub fn cmd_edit(options: &Options, log: &Log) -> Result<(), Box<dyn Error>> {
     let unmerged_paths = Git::get_unmerged_paths(&git_dir)?;
     let commit = log.next_commit();
 
-    if unmerged_paths.len() > 0 {
-        println!("{}", "Unmerged paths:");
-        for path in unmerged_paths.iter() {
-            println!("\t{}", path.1.red());
-        }
-        println!("");
-    }
+    print_session(&git_dir)?;
 
     for path in unmerged_paths.iter() {
         let file = &path.1;
@@ -191,31 +219,7 @@ pub fn cmd_status(options: &Options, log: &Log) -> Result<(), Box<dyn Error>> {
         GitSession::NONE => println!("No session"),
     }
 
-
-    let unmerged_paths = Git::get_unmerged_paths(&git_dir)?;
-    let modified_paths = Git::get_modified_paths(&git_dir)?;
-    let unstaged_paths = Git::get_unstaged_paths(&git_dir)?;
-
-    if modified_paths.len() > 0 {
-        println!("\nChanges to be committed:");
-        for path in modified_paths.iter() {
-            println!("\t{}", path.1.green());
-        }
-    }
-
-    if unmerged_paths.len() > 0 {
-        println!("\nUnmerged paths:");
-        for path in unmerged_paths.iter() {
-            println!("\t{}", path.1.red());
-        }
-    }
-
-    if unstaged_paths.len() > 0 {
-        println!("\nChanges not staged for commit:");
-        for path in unstaged_paths.iter() {
-            println!("\t{}", path.1.red());
-        }
-    }
+    print_session(&git_dir)?;
 
     println!("");
 
