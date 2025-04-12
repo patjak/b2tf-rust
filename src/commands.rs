@@ -104,6 +104,14 @@ pub fn cmd_edit(options: &Options, log: &Log) -> Result<(), Box<dyn Error>> {
     let unmerged_paths = Git::get_unmerged_paths(&git_dir)?;
     let commit = log.next_commit();
 
+    if unmerged_paths.len() > 0 {
+        println!("{}", "Unmerged paths:");
+        for path in unmerged_paths.iter() {
+            println!("\t{}", path.1.red());
+        }
+        println!("");
+    }
+
     for path in unmerged_paths.iter() {
         let file = &path.1;
         let file_path = Path::new(file);
