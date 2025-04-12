@@ -88,7 +88,7 @@ fn find_conflict_lineno(file: String) -> Result<String, Box<dyn Error>> {
         .expect("Failed to grep for conflict line");
 
     if !output.status.success() {
-        return Err("Failed to grep conflict line".into());
+        return Ok("0".into());
     }
 
     let stdout = String::from_utf8(output.stdout).expect("Invalid UTF8");
