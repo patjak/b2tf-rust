@@ -168,10 +168,14 @@ pub fn cmd_edit(options: &Options, log: &Log) -> Result<(), Box<dyn Error>> {
         let commit_file = format!("/tmp/{}.patch", commit);
         let target_file = format!("/tmp/{}-{}", range_stop, file_path.file_name().unwrap().to_str().unwrap());
 
-        let val = Util::ask(format!("Edit {} (Y)es/(n)o)? ", file.bold()), vec!["y", "n"], "y");
-        if val == "n" {
-            continue;
-        }
+        let ask = Util::ask(format!("Edit {} (Y)es/(n)o)/(a)bort? ", file.bold()), vec!["y", "n", "a"], "y");
+        let val = ask.as_str();
+
+        match val {
+            "n" => continue,
+            "a" => return Ok(()),
+            _ => val,
+        };
 
         // Find the line number where to start editing
         let lineno = find_conflict_lineno(format!("{}/{}", git_dir, file))?;
