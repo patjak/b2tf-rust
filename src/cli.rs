@@ -7,7 +7,7 @@ impl Cli {
     pub fn parse() -> ArgMatches {
         let matches = command!()
             .name("Back 2 The Future")
-            .display_name("display name")
+            .display_name("b2tf")
             .author("Patrik Jakobsson <patrik.r.jakobsson@gmail.com>")
             .arg(Arg::new("debug")
                 .long("debug")
