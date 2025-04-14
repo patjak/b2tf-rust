@@ -97,6 +97,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         cmd_edit(&options, &log)?;
     } else if let Some(_matches) = matches.subcommand_matches("restart") {
         cmd_restart(&options, &mut log)?;
+    } else if let Some(_matches) = matches.subcommand_matches("skip") {
+        cmd_skip(&options, &mut log)?;
     }
 
     Ok(())

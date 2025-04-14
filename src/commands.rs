@@ -280,3 +280,21 @@ pub fn cmd_restart(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error
     log.save()?;
     Ok(())
 }
+
+pub fn cmd_skip(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
+    let git_dir = options.git_dir.clone().unwrap();
+    let log_read = log.clone();
+
+    let session = Git::get_session(&git_dir)?;
+
+    if session == GitSession::CHERRYPICK {
+            Git::cmd("cherry-pick --abort".to_string(), &git_dir)?;
+    }
+
+    let next_commit = log_read.next_commit();
+    log.commit_update(next_commit, "skip")?;
+
+    println!("Skipped {next_commit}. Run 'apply' to continue.");
+
+    Ok(())
+}
