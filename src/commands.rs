@@ -247,3 +247,36 @@ pub fn cmd_status(options: &Options, log: &Log) -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
+
+pub fn cmd_restart(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
+    let git_dir = options.git_dir.clone().unwrap();
+    let branch_point = options.branch_point.clone().unwrap();
+
+    let val = Util::ask("This operation will delete all current progress and restart applying commits from the beginning. Are you sure? (y)es/(N)o: ".to_string(), vec!["y", "n"], "n");
+
+    if val != "y" {
+        return Ok(());
+    }
+
+    println!("Reseting...");
+    Git::cmd(format!("reset --hard {}", branch_point), &git_dir)?;
+
+    let mut commits = String::from("");
+    let lines: Vec<&str> = log.commits.split("\n").collect();
+
+    for line in lines {
+        let cols: Vec<&str> = line.trim().split(" ").collect();
+
+        if cols.len() == 2 && cols[0].len() == 40 {
+            commits.push_str(cols[0]);
+            commits.push_str("\n");
+        } else {
+            commits.push_str(line);
+            commits.push_str("\n");
+        }
+    }
+
+    log.commits = commits;
+    log.save()?;
+    Ok(())
+}
