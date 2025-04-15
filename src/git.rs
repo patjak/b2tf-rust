@@ -5,6 +5,7 @@ use std::error::Error;
 pub struct Commit {
     pub hash: String,
     pub subject: String,
+    pub message: String,
 }
 
 pub struct Git {
@@ -45,13 +46,19 @@ impl Git {
         let mut commit = Commit {
             hash: "".to_string(),
             subject: "".to_string(),
+            message: "".to_string(),
         };
 
-        let stdout: &str = &Git::cmd(format!("log --format='%H%n%s' -n1 {}", hash), dir)?;
+        let stdout: &str = &Git::cmd(format!("log --format='%H%n%s%n%b' -n1 {}", hash), dir)?;
         let lines: Vec<&str> = stdout.split("\n").collect();
 
         commit.hash = lines[0].trim().to_string();
         commit.subject = lines[1].trim().to_string();
+
+        for line in lines.iter().skip(2) {
+            commit.message.push_str(line);
+            commit.message.push_str("\n");
+        }
 
         return Ok(commit);
     }
