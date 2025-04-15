@@ -13,7 +13,7 @@ pub fn cmd_populate(options: &Options, log: &mut Log) -> Result<(), Box<dyn Erro
     let range_stop = options.range_stop.clone().unwrap();
     let paths = options.paths.clone().unwrap();
 
-    let query = format!("git -C {git_dir} rev-list --topo-order --no-merges --oneline --no-abbrev-commit {range_start}..{range_stop} -- {paths}");
+    let query = format!("git -C {git_dir} rev-list --reverse --topo-order --no-merges --oneline --no-abbrev-commit {range_start}..{range_stop} -- {paths}");
 
     let output = Command::new("sh")
         .arg("-c")
