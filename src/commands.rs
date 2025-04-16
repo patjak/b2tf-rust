@@ -6,6 +6,7 @@ use crate::Options;
 use crate::Log;
 use crate::Util;
 use crate::git::{Git, GitSession};
+use patch::{Patch};
 
 pub fn cmd_populate(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
     let git_dir = options.git_dir.clone().unwrap();
