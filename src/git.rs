@@ -5,7 +5,7 @@ use std::error::Error;
 pub struct Commit {
     pub hash: String,
     pub subject: String,
-    pub message: String,
+    pub body: String,
 }
 
 pub struct Git {
@@ -41,23 +41,23 @@ impl Git {
         Ok(stdout)
     }
 
-    pub fn log(hash: &str, dir: &String) -> Result<Commit, Box<dyn Error>> {
+    pub fn show(hash: &str, dir: &String) -> Result<Commit, Box<dyn Error>> {
 
         let mut commit = Commit {
             hash: "".to_string(),
             subject: "".to_string(),
-            message: "".to_string(),
+            body: "".to_string(),
         };
 
-        let stdout: &str = &Git::cmd(format!("log --format='%H%n%s%n%b' -n1 {}", hash), dir)?;
+        let stdout: &str = &Git::cmd(format!("show --format='%H%n%s%n%b' -n1 {}", hash), dir)?;
         let lines: Vec<&str> = stdout.split("\n").collect();
 
         commit.hash = lines[0].trim().to_string();
         commit.subject = lines[1].trim().to_string();
 
         for line in lines.iter().skip(2) {
-            commit.message.push_str(line);
-            commit.message.push_str("\n");
+            commit.body.push_str(line);
+            commit.body.push_str("\n");
         }
 
         return Ok(commit);

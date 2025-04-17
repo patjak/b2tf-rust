@@ -49,6 +49,97 @@ pub fn cmd_populate(options: &Options, log: &mut Log) -> Result<(), Box<dyn Erro
     Ok(())
 }
 
+// Returns a tuple with hash of commits containing a cherry pick tag and its cherry pick hash
+fn get_cherrypick_cache(options: &Options) -> Result<Vec<(String, String)>, Box<dyn Error>> {
+    let git_dir = options.git_dir.clone().unwrap();
+    let paths = options.paths.clone().unwrap();
+    let range_start = options.range_start.clone().unwrap();
+    let mut cache: Vec<(String, String)> = vec![];
+
+    let query = format!("log --date=format:%Y-%m-%d --format=%cd -n1 {range_start}").to_string();
+    let start_date = Git::cmd(query, &git_dir)?;
+    let start_date = start_date.trim();
+
+    let query = format!("log --no-merges --since \"$(date --date \"{start_date} - 6 months\")\" --format='%H' --grep=\"(cherry picked from commit \" -- {paths}").to_string();
+    let stdout = Git::cmd(query, &git_dir)?;
+
+    let lines: Vec<&str> = stdout.split("\n").collect();
+    for line in lines.iter() {
+        if line.len() != 40 {
+            continue;
+        }
+        let hash = line[..40].to_string();
+        let commit = Git::show(&hash, &git_dir)?;
+        let sections: Vec<_> = commit.body.split("(cherry picked from commit ").collect();
+        if sections.len() != 2 {
+            return Err("Invalid commit with multiple cherry pick lines".into());
+        }
+        let section = sections[1];
+        let cherrypick = section[..40].to_string();
+        if cherrypick.len() != 40 || hash.len() != 40 {
+            return Err("NOOOO!".into());
+        }
+        cache.push((hash, cherrypick));
+    }
+
+    Ok(cache)
+}
+
+// Return a tuple with (hash, subject) of all commits that can potentially be a cherry pick
+fn get_commit_cache(options: &Options) -> Result<Vec<(String, String)>, Box<dyn Error>> {
+    let git_dir = options.git_dir.clone().unwrap();
+    let paths = options.paths.clone().unwrap();
+    let range_start = options.range_start.clone().unwrap();
+    let mut cache: Vec<(String, String)> = vec![];
+
+    let query = format!("log --date=format:%Y-%m-%d --format=%cd -n1 {range_start}").to_string();
+    let start_date = Git::cmd(query, &git_dir)?;
+    let start_date = start_date.trim();
+
+    let query = format!("log --no-merges --since \"$(date --date \"{start_date} - 6 months\")\" --format='%H %s' -- {paths}").to_string();
+    let stdout = Git::cmd(query, &git_dir)?;
+
+    let lines: Vec<&str> = stdout.split("\n").collect();
+    for line in lines.iter() {
+        if line.len() < 41 {
+            continue;
+        }
+        let hash = line[..40].to_string();
+        let subject = line[41..].to_string();
+        cache.push((hash, subject));
+    }
+
+    Ok(cache)
+}
+
+fn compare_patches(options: &Options, hash1: &String, hash2: &String) -> Result<bool, Box<dyn Error>> {
+    let git_dir = options.git_dir.clone().unwrap();
+
+    let commit1 = Git::show(hash1.as_str(), &git_dir)?;
+    let commit2 = Git::show(hash2.as_str(), &git_dir)?;
+    let patch1 = Patch::from_single(&commit1.body).unwrap();
+    let patch2 = Patch::from_single(&commit2.body).unwrap();
+
+    for hunk1 in &patch1.hunks {
+        let mut found = false;
+        for hunk2 in &patch2.hunks {
+
+            // Compare only the lines and not the ranges since they can vary based on which kernel
+            // base they got applied to
+            if hunk1.lines == hunk2.lines {
+                found = true;
+                break;
+            }
+        }
+
+        if found == false {
+            return Ok(false);
+        }
+    }
+
+    Ok(true)
+}
+
 pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
     let git_dir = options.git_dir.clone().unwrap();
     let branch = options.branch.clone().unwrap();
@@ -87,17 +178,94 @@ pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>>
         return Err("In session".into());
     }
 
+    let cherrypick_cache = get_cherrypick_cache(options)?;
+    let commit_cache = get_commit_cache(options)?;
+
     loop {
         let log_read = log.clone();
         let next_hash = log_read.next_commit();
-        let commit = Git::log(&next_hash, &git_dir)?;
+        let commit = Git::show(&next_hash, &git_dir)?;
 
-        println!("Applying {}/{}: {} {}", i, num_commits, next_hash, commit.subject);
+        println!("{} {}/{}: {} {}", "Applying".green(), i, num_commits, next_hash, commit.subject);
 
-        let res = Git::cmd(format!("cherry-pick {}", next_hash), &git_dir);
+        // Check for obvious cherry picks (commits WITH cherry pick tag) before trying to apply
+        let mut is_cherrypick = false;
+        for cherry in cherrypick_cache.iter() {
+            let mut cherry_hash = "";
+
+            if commit.hash == cherry.0 {
+                cherry_hash = &cherry.1;
+            } else if commit.hash == cherry.1 {
+                cherry_hash = &cherry.0;
+            }
+
+            if cherry_hash != "" {
+                println!("{} {}","Found cherry pick:".green(), cherry_hash);
+                is_cherrypick = true;
+                log.commit_update(next_hash, format!("cherry pick {}", cherry_hash).as_str())?;
+                break;
+            }
+        }
+
+        if is_cherrypick {
+            i += 1;
+            continue;
+        }
+
+        // Apply commit
+        let res = Git::cmd(format!("cherry-pick {} > /dev/null", next_hash), &git_dir);
+
         match res {
             Ok(_) => (),
-            Err(_) => return cmd_edit(&options, &log),
+            Err(_) => {
+                // If apply fails, check for duplicates (commits WITHOUT cherry pick tag)
+                let mut is_duplicate = false;
+
+                for cache_item in commit_cache.iter() {
+                    // Do a quick compare on subject to avoid the costly compare_patches() call.
+                    if commit.subject == cache_item.1 {
+                        let res = compare_patches(options, &commit.hash, &cache_item.0)?;
+                        if res {
+                            println!("{} {}", "Found duplicate:".yellow(), cache_item.0);
+                            is_duplicate = true;
+                            log.commit_update(next_hash, format!("duplicate {}", cache_item.0).as_str())?;
+                            break;
+                        }
+                    }
+                }
+
+                if is_duplicate {
+                    i += 1;
+                    continue;
+                }
+
+                // We cannot always find a cherry pick or duplicate but it can still be one
+                // If the effect of the commit is empty we most likely have one anyway
+                let modified_paths = Git::get_modified_paths(&git_dir)?;
+                let unmerged_paths = Git::get_unmerged_paths(&git_dir)?;
+
+                if unmerged_paths.len() == 0 && modified_paths.len() == 0 {
+                    println!("{}", "Found empty commit".yellow());
+                    let next_commit = log_read.next_commit();
+                    Git::cmd("cherry-pick --abort".to_string(), &git_dir)?;
+                    log.commit_update(next_commit, "empty")?;
+                    i += 1;
+                    continue;
+                }
+
+                // If we didn't find a cherry pick or duplicate, we probably have a normal conflict
+                println!("{}", "Failed to apply commit!".red());
+                cmd_edit(&options, &log)?;
+
+                // If the used didn't fix the conflict we abort
+                let unmerged_paths = Git::get_unmerged_paths(&git_dir)?;
+                if unmerged_paths.len() != 0 {
+                    return Err("Conflict not resolved".into());
+                }
+
+                // The edit was successful
+                Git::cmd("cherry-pick --continue".to_string(), &git_dir)?;
+            },
         }
         let new_hash = Git::get_last_commit(&git_dir)?;
 
