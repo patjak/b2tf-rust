@@ -337,51 +337,59 @@ pub fn cmd_edit(options: &Options, log: &Log) -> Result<(), Box<dyn Error>> {
         let commit_file = format!("/tmp/{}.patch", commit);
         let target_file = format!("/tmp/{}-{}", range_stop, file_path.file_name().unwrap().to_str().unwrap());
 
-        let ask = Util::ask(format!("Edit {} (Y)es/(n)o)/(a)bort? ", file.bold()), vec!["y", "n", "a"], "y");
-        let val = ask.as_str();
+        loop {
+            let ask = Util::ask(format!("Edit {} (Y)es/(n)o)/(s)kip commit/(a)bort? ", file.bold()), vec!["y", "n", "s", "a"], "y");
+            let val = ask.as_str();
 
-        match val {
-            "n" => continue,
-            "a" => return Ok(()),
-            _ => val,
-        };
+            match val {
+                "n" => continue,
+                "a" => return Err("Aborted".into()),
+                "s" => {
+                    let mut log_mut = log.clone();
+                    cmd_skip(options, &mut log_mut)?;
+                    return Ok(());
+                },
+                _ => val,
+            };
 
-        // Find the line number where to start editing
-        let lineno = find_conflict_lineno(format!("{}/{}", git_dir, file))?;
+            // Find the line number where to start editing
+            let lineno = find_conflict_lineno(format!("{}/{}", git_dir, file))?;
 
-        // Store the commit as a patch file
-        Git::cmd(format!("show {} > {}", commit, commit_file), &git_dir)?;
+            // Store the commit as a patch file
+            Git::cmd(format!("show {} > {}", commit, commit_file), &git_dir)?;
 
-        // Store the target version of the file (eg git show v5.5:<filepath>)
-        Git::cmd(format!("show {}:{} > {}", range_stop, file, target_file), &git_dir)?;
+            // Store the target version of the file (eg git show v5.5:<filepath>)
+            Git::cmd(format!("show {}:{} > {}", range_stop, file, target_file), &git_dir)?;
 
-        // FIXME: Add support for other editors than vim
-        Command::new("sh")
-            .arg("-c")
-            .arg(format!("cd {git_dir} && vim {commit_file} -c 'vs {target_file} | {lineno}' -c 'vs {file} | {lineno}'"))
-            .status()
-            .expect("Failed to open editor");
+            // FIXME: Add support for other editors than vim
+            Command::new("sh")
+                .arg("-c")
+                .arg(format!("cd {git_dir} && vim {commit_file} -c 'vs {target_file} | {lineno}' -c 'vs {file} | {lineno}'"))
+                .status()
+                .expect("Failed to open editor");
 
-        Command::new("sh")
-            .arg("-c")
-            .arg(format!("rm {commit_file} && rm {target_file}"))
-            .status()
-            .expect("Failed to remove temporary files");
+            Command::new("sh")
+                .arg("-c")
+                .arg(format!("rm {commit_file} && rm {target_file}"))
+                .status()
+                .expect("Failed to remove temporary files");
 
-        // Check lineno again to see if all conflicts are solved
-        let lineno = find_conflict_lineno(format!("{}/{}", git_dir, file))?;
-        if lineno == "0" {
-            Git::cmd(format!("add {file}"), &git_dir)?;
-        } else {
-            println!("{}", "File still contains conflics!".red());
+            // Check lineno again to see if all conflicts are solved
+            let lineno = find_conflict_lineno(format!("{}/{}", git_dir, file))?;
+            if lineno == "0" {
+                Git::cmd(format!("add {file}"), &git_dir)?;
+                break;
+            } else {
+                println!("{}", "File still contains conflics!".red());
+            }
         }
-    }
-    let unmerged_paths = Git::get_unmerged_paths(&git_dir)?;
+        let unmerged_paths = Git::get_unmerged_paths(&git_dir)?;
 
-    if unmerged_paths.len() == 0 {
-        println!("All conflicts fixed. Run 'apply' to continue.");
-    } else {
-        println!("Not all conflicts are fixed. Run 'edit' to fix them.");
+        if unmerged_paths.len() == 0 {
+            println!("All conflicts fixed. Continuing");
+        } else {
+            println!("Not all conflicts are fixed. Running 'edit' again.");
+        }
     }
 
     Ok(())
