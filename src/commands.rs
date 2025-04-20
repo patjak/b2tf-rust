@@ -450,7 +450,7 @@ pub fn cmd_restart(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error
     for line in lines {
         let cols: Vec<&str> = line.trim().split(" ").collect();
 
-        if cols.len() == 2 && cols[0].len() == 40 {
+        if cols.len() >= 2 && cols[0].len() == 40 {
             commits.push_str(cols[0]);
             commits.push_str("\n");
         } else {
