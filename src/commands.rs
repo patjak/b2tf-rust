@@ -424,7 +424,9 @@ pub fn cmd_status(options: &Options, log: &Log) -> Result<(), Box<dyn Error>> {
 
     print_session(&git_dir)?;
 
-    println!("");
+    let next_commit = log.next_commit();
+    let commit = Git::show(next_commit, &git_dir)?;
+    println!("\nNext commit to apply:\n{} {}", commit.hash, commit.subject);
 
     Ok(())
 }
