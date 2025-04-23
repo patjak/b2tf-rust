@@ -180,7 +180,7 @@ pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>>
     let branch = options.branch.clone().unwrap();
     let log_read = log.clone();
     let mut i: u32 = log_read.next_index();
-    let num_commits = log_read.num_commits().unwrap();
+    let num_commits = log_read.num_commits()?;
 
     Git::set_branch(&branch, &git_dir)?;
 
@@ -387,11 +387,11 @@ pub fn cmd_status(options: &Options, log: &Log) -> Result<(), Box<dyn Error>> {
     Git::set_branch(&branch, &git_dir)?;
 
     let next_index = log.next_index();
-    let num_commits = log.num_commits().unwrap();
+    let num_commits = log.num_commits()?;
     let percentage = (next_index / num_commits) * 100;
     println!("Progress {}% ({}/{})", percentage, next_index, num_commits);
 
-    let stdout = Git::cmd(format!("diff --stat {branch} {range_stop} -- {paths}"), &git_dir).unwrap();
+    let stdout = Git::cmd(format!("diff --stat {branch} {range_stop} -- {paths}"), &git_dir)?;
     let lines: Vec<&str> = stdout.split("\n").collect();
     let summary = lines[lines.len() - 2].trim();
 
