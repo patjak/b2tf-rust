@@ -94,7 +94,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     } else if let Some(_matches) = matches.subcommand_matches("status") {
         cmd_status(&options, &log)?;
     } else if let Some(_matches) = matches.subcommand_matches("edit") {
-        cmd_edit(&options, &log)?;
+        cmd_edit(&options, &mut log)?;
     } else if let Some(_matches) = matches.subcommand_matches("restart") {
         cmd_restart(&options, &mut log)?;
     } else if let Some(_matches) = matches.subcommand_matches("skip") {

@@ -140,46 +140,57 @@ fn compare_patches(options: &Options, hash1: &String, hash2: &String) -> Result<
     Ok(true)
 }
 
-pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
+fn handle_git_state(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
     let git_dir = options.git_dir.clone().unwrap();
-    let branch = options.branch.clone().unwrap();
-    let modified_paths = Git::get_modified_paths(&git_dir)?;
-    let unmerged_paths = Git::get_unmerged_paths(&git_dir)?;
-    let log_read = log.clone();
-    let mut i: u32 = log_read.next_index();
-    let num_commits = log_read.num_commits().unwrap();
-
-    Git::set_branch(&branch, &git_dir)?;
-
     let session = Git::get_session(&git_dir)?;
 
     if session == GitSession::CHERRYPICK {
+        let modified_paths = Git::get_modified_paths(&git_dir)?;
+        let unmerged_paths = Git::get_unmerged_paths(&git_dir)?;
+        let log_read = log.clone();
+        let next_hash = log_read.next_commit();
+
         // Check for empty commit
         if unmerged_paths.len() == 0 && modified_paths.len() == 0 {
-            let next_commit = log_read.next_commit();
             Git::cmd("cherry-pick --abort".to_string(), &git_dir)?;
-            log.commit_update(next_commit, "empty")?;
+            log.commit_update(next_hash, "empty")?;
+            return Ok(());
+        }
+
+        // If we have conflicts then edit them
+        if unmerged_paths.len() != 0 {
+            cmd_edit(options, log)?;
+            return Ok(());
         }
 
         // Check if all conflicts are resolved so we can update log and continue
         if unmerged_paths.len() == 0 && modified_paths.len() > 0 {
-            let next_commit = log_read.next_commit();
             Git::cmd("cherry-pick --continue".to_string(), &git_dir)?;
-            let new_commit = Git::get_last_commit(&git_dir)?;
-            log.commit_update(next_commit, &new_commit)?;
-        }
-
-        if unmerged_paths.len() > 0 {
-            print_session(&git_dir)?;
-            println!("\nNot all conflicts are fixed. Run 'edit' to fix them.");
+            let new_hash = Git::get_last_commit(&git_dir)?;
+            log.commit_update(next_hash, &new_hash)?;
             return Ok(());
         }
     } else if session != GitSession::NONE {
         return Err("In session".into());
     }
 
+    Ok(())
+}
+
+pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
+    let git_dir = options.git_dir.clone().unwrap();
+    let branch = options.branch.clone().unwrap();
+    let log_read = log.clone();
+    let mut i: u32 = log_read.next_index();
+    let num_commits = log_read.num_commits().unwrap();
+
+    Git::set_branch(&branch, &git_dir)?;
+
     let cherrypick_cache = get_cherrypick_cache(options)?;
     let commit_cache = get_commit_cache(options)?;
+
+    // After this call the tree should be clean and ready to enter the apply loop
+    handle_git_state(options, log)?;
 
     loop {
         let log_read = log.clone();
@@ -187,6 +198,7 @@ pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>>
         let commit = Git::show(&next_hash, &git_dir)?;
 
         println!("{} {}/{}: {} {}", "Applying".green(), i, num_commits, next_hash, commit.subject);
+        i += 1;
 
         // Check for obvious cherry picks (commits WITH cherry pick tag) before trying to apply
         let mut is_cherrypick = false;
@@ -208,7 +220,6 @@ pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>>
         }
 
         if is_cherrypick {
-            i += 1;
             continue;
         }
 
@@ -216,7 +227,10 @@ pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>>
         let res = Git::cmd(format!("cherry-pick {} > /dev/null", next_hash), &git_dir);
 
         match res {
-            Ok(_) => (),
+            Ok(_) => {
+                let new_hash = Git::get_last_commit(&git_dir)?;
+                log.commit_update(next_hash, &new_hash)?;
+            },
             Err(_) => {
                 // If apply fails, check for duplicates (commits WITHOUT cherry pick tag)
                 let mut is_duplicate = false;
@@ -235,42 +249,18 @@ pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>>
                 }
 
                 if is_duplicate {
-                    i += 1;
                     continue;
                 }
 
-                // We cannot always find a cherry pick or duplicate but it can still be one
-                // If the effect of the commit is empty we most likely have one anyway
-                let modified_paths = Git::get_modified_paths(&git_dir)?;
-                let unmerged_paths = Git::get_unmerged_paths(&git_dir)?;
+                handle_git_state(options, log)?;
 
-                if unmerged_paths.len() == 0 && modified_paths.len() == 0 {
-                    println!("{}", "Found empty commit".yellow());
-                    let next_commit = log_read.next_commit();
-                    Git::cmd("cherry-pick --abort".to_string(), &git_dir)?;
-                    log.commit_update(next_commit, "empty")?;
-                    i += 1;
-                    continue;
-                }
-
-                // If we didn't find a cherry pick or duplicate, we probably have a normal conflict
-                println!("{}", "Failed to apply commit!".red());
-                cmd_edit(&options, &log)?;
-
-                // If the used didn't fix the conflict we abort
+                // If the user didn't fix the conflict we abort
                 let unmerged_paths = Git::get_unmerged_paths(&git_dir)?;
                 if unmerged_paths.len() != 0 {
                     return Err("Conflict not resolved".into());
                 }
-
-                // The edit was successful
-                Git::cmd("cherry-pick --continue".to_string(), &git_dir)?;
             },
         }
-        let new_hash = Git::get_last_commit(&git_dir)?;
-
-        log.commit_update(next_hash, new_hash.trim())?;
-        i += 1;
     }
 }
 
@@ -323,7 +313,7 @@ fn find_conflict_lineno(file: String) -> Result<String, Box<dyn Error>> {
     Ok(lineno)
 }
 
-pub fn cmd_edit(options: &Options, log: &Log) -> Result<(), Box<dyn Error>> {
+pub fn cmd_edit(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
     let git_dir = options.git_dir.clone().unwrap();
     let range_stop = options.range_stop.clone().unwrap();
     let unmerged_paths = Git::get_unmerged_paths(&git_dir)?;
@@ -342,11 +332,10 @@ pub fn cmd_edit(options: &Options, log: &Log) -> Result<(), Box<dyn Error>> {
             let val = ask.as_str();
 
             match val {
-                "n" => continue,
-                "a" => return Err("Aborted".into()),
+                "n" => break,
+                "a" => return Err("Aborted by user".into()),
                 "s" => {
-                    let mut log_mut = log.clone();
-                    cmd_skip(options, &mut log_mut)?;
+                    cmd_skip(options, log)?;
                     return Ok(());
                 },
                 _ => val,
@@ -384,11 +373,10 @@ pub fn cmd_edit(options: &Options, log: &Log) -> Result<(), Box<dyn Error>> {
             }
         }
         let unmerged_paths = Git::get_unmerged_paths(&git_dir)?;
+        let modified_paths = Git::get_modified_paths(&git_dir)?;
 
-        if unmerged_paths.len() == 0 {
-            println!("All conflicts fixed. Continuing");
-        } else {
-            println!("Not all conflicts are fixed. Running 'edit' again.");
+        if unmerged_paths.len() == 0 && modified_paths.len() > 0 {
+            println!("All conflicts resolved.");
         }
     }
 
@@ -471,13 +459,13 @@ pub fn cmd_skip(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> 
     let session = Git::get_session(&git_dir)?;
 
     if session == GitSession::CHERRYPICK {
-            Git::cmd("cherry-pick --abort".to_string(), &git_dir)?;
+        Git::cmd("cherry-pick --abort".to_string(), &git_dir)?;
     }
 
     let next_commit = log_read.next_commit();
     log.commit_update(next_commit, "skip")?;
 
-    println!("Skipped {next_commit}. Run 'apply' to continue.");
+    println!("Skipped {next_commit}.");
 
     Ok(())
 }
