@@ -15,6 +15,7 @@ pub struct GitSession {
     pub state: GitSessionState,
     pub modified_paths: Vec<(String, String)>,
     pub unmerged_paths: Vec<(String, String)>,
+    pub unstaged_paths: Vec<(String, String)>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -100,14 +101,16 @@ impl Git {
     }
 
     pub fn get_session(dir: &String) -> Result<GitSession, Box<dyn Error>> {
+        let stdout: &str = &Git::cmd("status".to_string(), dir)?;
+
         let mut session: GitSession = GitSession {
             state:  GitSessionState::NONE,
-            unmerged_paths: Git::get_unmerged_paths(dir)?,
-            modified_paths: Git::get_modified_paths(dir)?,
+            unmerged_paths: Git::get_unmerged_paths(stdout)?,
+            modified_paths: Git::get_modified_paths(stdout)?,
+            unstaged_paths: Git::get_unstaged_paths(stdout)?,
         };
-        let stdout: &str = &Git::cmd("status".to_string(), dir).unwrap();
-        let lines: Vec<&str> = stdout.split("\n").collect();
 
+        let lines: Vec<&str> = stdout.split("\n").collect();
         if lines[0].trim() == "interactive rebase in progress" {
             session.state  = GitSessionState::REBASE;
         } else if lines[1].len() > 39 && lines[1][..39].trim() == "You are currently cherry-picking commit" {
@@ -117,8 +120,7 @@ impl Git {
         Ok(session)
     }
 
-    pub fn parse_session_paths(dir: &String, typestr: &str) -> Result<Vec<(String, String)>, Box<dyn Error>> {
-        let stdout: &str = &Git::cmd("status".to_string(), dir)?;
+    pub fn parse_session_paths(stdout: &str, typestr: &str) -> Result<Vec<(String, String)>, Box<dyn Error>> {
         let sections: Vec<&str> = stdout.split(typestr).collect();
         let mut paths: Vec<(String, String)> = Vec::new();
 
@@ -146,15 +148,15 @@ impl Git {
         Ok(paths)
     }
 
-    pub fn get_unmerged_paths(dir: &String) -> Result<Vec<(String, String)>, Box<dyn Error>> {
-        Git::parse_session_paths(&dir, "Unmerged paths:")
+    pub fn get_unmerged_paths(stdout: &str) -> Result<Vec<(String, String)>, Box<dyn Error>> {
+        Git::parse_session_paths(stdout, "Unmerged paths:")
     }
 
-    pub fn get_modified_paths(dir: &String) -> Result<Vec<(String, String)>, Box<dyn Error>> {
-        Git::parse_session_paths(&dir, "Changes to be committed:")
+    pub fn get_modified_paths(stdout: &str) -> Result<Vec<(String, String)>, Box<dyn Error>> {
+        Git::parse_session_paths(stdout, "Changes to be committed:")
     }
 
-    pub fn get_unstaged_paths(dir: &String) -> Result<Vec<(String, String)>, Box<dyn Error>> {
-        Git::parse_session_paths(&dir, "Changes not staged for commit:")
+    pub fn get_unstaged_paths(stdout: &str) -> Result<Vec<(String, String)>, Box<dyn Error>> {
+        Git::parse_session_paths(stdout, "Changes not staged for commit:")
     }
 }

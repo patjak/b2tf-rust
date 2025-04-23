@@ -5,7 +5,7 @@ use colored::Colorize;
 use crate::Options;
 use crate::Log;
 use crate::Util;
-use crate::git::{Git, GitSession, GitSessionState};
+use crate::git::{Git, GitSessionState};
 use patch::{Patch};
 
 pub fn cmd_populate(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
@@ -145,26 +145,24 @@ fn handle_git_state(options: &Options, log: &mut Log) -> Result<(), Box<dyn Erro
     let session = Git::get_session(&git_dir)?;
 
     if session.state == GitSessionState::CHERRYPICK {
-        let modified_paths = Git::get_modified_paths(&git_dir)?;
-        let unmerged_paths = Git::get_unmerged_paths(&git_dir)?;
         let log_read = log.clone();
         let next_hash = log_read.next_commit();
 
         // Check for empty commit
-        if unmerged_paths.len() == 0 && modified_paths.len() == 0 {
+        if session.unmerged_paths.len() == 0 && session.modified_paths.len() == 0 {
             Git::cmd("cherry-pick --abort".to_string(), &git_dir)?;
             log.commit_update(next_hash, "empty")?;
             return Ok(());
         }
 
         // If we have conflicts then edit them
-        if unmerged_paths.len() != 0 {
+        if session.unmerged_paths.len() != 0 {
             cmd_edit(options, log)?;
             return Ok(());
         }
 
         // Check if all conflicts are resolved so we can update log and continue
-        if unmerged_paths.len() == 0 && modified_paths.len() > 0 {
+        if session.unmerged_paths.len() == 0 && session.modified_paths.len() > 0 {
             Git::cmd("cherry-pick --continue".to_string(), &git_dir)?;
             let new_hash = Git::get_last_commit(&git_dir)?;
             log.commit_update(next_hash, &new_hash)?;
@@ -254,9 +252,10 @@ pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>>
 
                 handle_git_state(options, log)?;
 
+                let session = Git::get_session(&git_dir)?;
+
                 // If the user didn't fix the conflict we abort
-                let unmerged_paths = Git::get_unmerged_paths(&git_dir)?;
-                if unmerged_paths.len() != 0 {
+                if session.unmerged_paths.len() != 0 {
                     return Err("Conflict not resolved".into());
                 }
             },
@@ -264,35 +263,32 @@ pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>>
     }
 }
 
-pub fn print_session(git_dir: &String) -> Result<(), Box<dyn Error>> {
-    let unmerged_paths = Git::get_unmerged_paths(&git_dir)?;
-    let modified_paths = Git::get_modified_paths(&git_dir)?;
-    let unstaged_paths = Git::get_unstaged_paths(&git_dir)?;
+fn print_session(git_dir: &String) -> Result<(), Box<dyn Error>> {
+    let session = Git::get_session(&git_dir)?;
 
-    if modified_paths.len() > 0 {
+    if session.modified_paths.len() > 0 {
         println!("\nChanges to be committed:");
-        for path in modified_paths.iter() {
+        for path in session.modified_paths.iter() {
             println!("\t{}", path.1.green());
         }
     }
 
-    if unmerged_paths.len() > 0 {
+    if session.unmerged_paths.len() > 0 {
         println!("\nUnmerged paths:");
-        for path in unmerged_paths.iter() {
+        for path in session.unmerged_paths.iter() {
             println!("\t{}", path.1.red());
         }
     }
 
-    if unstaged_paths.len() > 0 {
+    if session.unstaged_paths.len() > 0 {
         println!("\nChanges not staged for commit:");
-        for path in unstaged_paths.iter() {
+        for path in session.unstaged_paths.iter() {
             println!("\t{}", path.1.red());
         }
     }
 
     Ok(())
 }
-
 
 // Returns the line number of the first occurance of '<<<<<<<' in file
 fn find_conflict_lineno(file: String) -> Result<String, Box<dyn Error>> {
@@ -316,12 +312,12 @@ fn find_conflict_lineno(file: String) -> Result<String, Box<dyn Error>> {
 pub fn cmd_edit(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
     let git_dir = options.git_dir.clone().unwrap();
     let range_stop = options.range_stop.clone().unwrap();
-    let unmerged_paths = Git::get_unmerged_paths(&git_dir)?;
+    let session = Git::get_session(&git_dir)?;
     let commit = log.next_commit();
 
     print_session(&git_dir)?;
 
-    for path in unmerged_paths.iter() {
+    for path in session.unmerged_paths.iter() {
         let file = &path.1;
         let file_path = Path::new(file);
         let commit_file = format!("/tmp/{}.patch", commit);
@@ -372,10 +368,9 @@ pub fn cmd_edit(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> 
                 println!("{}", "File still contains conflics!".red());
             }
         }
-        let unmerged_paths = Git::get_unmerged_paths(&git_dir)?;
-        let modified_paths = Git::get_modified_paths(&git_dir)?;
+        let session = Git::get_session(&git_dir)?;
 
-        if unmerged_paths.len() == 0 && modified_paths.len() > 0 {
+        if session.unmerged_paths.len() == 0 && session.modified_paths.len() > 0 {
             println!("All conflicts resolved.");
         }
     }
