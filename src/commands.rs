@@ -5,7 +5,7 @@ use colored::Colorize;
 use crate::Options;
 use crate::Log;
 use crate::Util;
-use crate::git::{Git, GitSession};
+use crate::git::{Git, GitSession, GitSessionState};
 use patch::{Patch};
 
 pub fn cmd_populate(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
@@ -144,7 +144,7 @@ fn handle_git_state(options: &Options, log: &mut Log) -> Result<(), Box<dyn Erro
     let git_dir = options.git_dir.clone().unwrap();
     let session = Git::get_session(&git_dir)?;
 
-    if session == GitSession::CHERRYPICK {
+    if session.state == GitSessionState::CHERRYPICK {
         let modified_paths = Git::get_modified_paths(&git_dir)?;
         let unmerged_paths = Git::get_unmerged_paths(&git_dir)?;
         let log_read = log.clone();
@@ -170,7 +170,7 @@ fn handle_git_state(options: &Options, log: &mut Log) -> Result<(), Box<dyn Erro
             log.commit_update(next_hash, &new_hash)?;
             return Ok(());
         }
-    } else if session != GitSession::NONE {
+    } else if session.state != GitSessionState::NONE {
         return Err("In session".into());
     }
 
@@ -402,12 +402,12 @@ pub fn cmd_status(options: &Options, log: &Log) -> Result<(), Box<dyn Error>> {
 
     println!("{summary}\n");
 
-    let session = Git::get_session(&git_dir).unwrap();
+    let session = Git::get_session(&git_dir)?;
 
-    match session {
-        GitSession::CHERRYPICK => println!("{}", "Session: Cherry-picking".yellow()),
-        GitSession::REBASE => println!("{}", "Session: Rebasing\n".yellow()),
-        GitSession::NONE => println!("No session"),
+    match session.state {
+        GitSessionState::CHERRYPICK => println!("{}", "Session: Cherry-picking".yellow()),
+        GitSessionState::REBASE => println!("{}", "Session: Rebasing\n".yellow()),
+        GitSessionState::NONE => println!("No session"),
     }
 
     print_session(&git_dir)?;
@@ -458,7 +458,7 @@ pub fn cmd_skip(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> 
 
     let session = Git::get_session(&git_dir)?;
 
-    if session == GitSession::CHERRYPICK {
+    if session.state == GitSessionState::CHERRYPICK {
         Git::cmd("cherry-pick --abort".to_string(), &git_dir)?;
     }
 

@@ -11,8 +11,14 @@ pub struct Commit {
 pub struct Git {
 }
 
+pub struct GitSession {
+    pub state: GitSessionState,
+    pub modified_paths: Vec<(String, String)>,
+    pub unmerged_paths: Vec<(String, String)>,
+}
+
 #[derive(Debug, PartialEq)]
-pub enum GitSession {
+pub enum GitSessionState {
     NONE,
     REBASE,
     CHERRYPICK,
@@ -94,16 +100,21 @@ impl Git {
     }
 
     pub fn get_session(dir: &String) -> Result<GitSession, Box<dyn Error>> {
+        let mut session: GitSession = GitSession {
+            state:  GitSessionState::NONE,
+            unmerged_paths: Git::get_unmerged_paths(dir)?,
+            modified_paths: Git::get_modified_paths(dir)?,
+        };
         let stdout: &str = &Git::cmd("status".to_string(), dir).unwrap();
         let lines: Vec<&str> = stdout.split("\n").collect();
 
         if lines[0].trim() == "interactive rebase in progress" {
-            return Ok(GitSession::REBASE);
+            session.state  = GitSessionState::REBASE;
         } else if lines[1].len() > 39 && lines[1][..39].trim() == "You are currently cherry-picking commit" {
-            return Ok(GitSession::CHERRYPICK);
+            session.state = GitSessionState::CHERRYPICK;
         }
 
-        Ok(GitSession::NONE)
+        Ok(session)
     }
 
     pub fn parse_session_paths(dir: &String, typestr: &str) -> Result<Vec<(String, String)>, Box<dyn Error>> {
