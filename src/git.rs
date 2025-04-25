@@ -1,5 +1,6 @@
 use std::process::Command;
 use std::error::Error;
+use crate::Log;
 
 #[derive(Debug)]
 pub struct Commit {
@@ -100,7 +101,7 @@ impl Git {
         Ok(())
     }
 
-    pub fn get_session(dir: &String) -> Result<GitSession, Box<dyn Error>> {
+    pub fn get_session(dir: &String, log: &Log) -> Result<GitSession, Box<dyn Error>> {
         let stdout: &str = &Git::cmd("status".to_string(), dir)?;
 
         let mut session: GitSession = GitSession {
@@ -115,6 +116,18 @@ impl Git {
             session.state  = GitSessionState::REBASE;
         } else if lines[1].len() > 39 && lines[1][..39].trim() == "You are currently cherry-picking commit" {
             session.state = GitSessionState::CHERRYPICK;
+        }
+
+        if session.state == GitSessionState::CHERRYPICK {
+            let hash: Vec<&str> = stdout.split("You are currently cherry-picking commit ").collect();
+            let hash: Vec<&str> = hash[1].split(".").collect();
+            let hash = hash[0];
+            let commit = Git::show(hash, dir)?;
+            let next_hash = log.next_commit();
+
+            if commit.hash != next_hash {
+                return Err("GIT repository is out of sync with Log".into());
+            }
         }
 
         Ok(session)
