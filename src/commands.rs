@@ -453,3 +453,22 @@ pub fn cmd_skip(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> 
 
     Ok(())
 }
+
+pub fn cmd_diff(options: &Options) -> Result<(), Box<dyn Error>> {
+    let git_dir = options.git_dir.clone().unwrap();
+    let branch = options.branch.clone().unwrap();
+    let range_stop = options.range_stop.clone().unwrap();
+    let paths = options.paths.clone().unwrap();
+
+    println!("{}", "Difference between current branch and range-stop".green());
+
+    let stdout = Git::cmd(format!("diff {branch} {range_stop} -- {paths}").to_string(), &git_dir)?;
+    println!("{stdout}");
+
+    println!("{}", "------------------------------------------------------------".green());
+
+    let stdout = Git::cmd(format!("diff --stat {branch} {range_stop} -- {paths}").to_string(), &git_dir)?;
+    println!("{stdout}");
+
+    Ok(())
+}
