@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.0.0", features = ["cargo", "derive"] }
 colored = "3.0.0"
+unidiff = "0.3.3"

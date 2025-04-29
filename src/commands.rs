@@ -1,3 +1,4 @@
+extern crate unidiff;
 use std::process::Command;
 use std::error::Error;
 use std::path::Path;
@@ -6,7 +7,7 @@ use crate::Options;
 use crate::Log;
 use crate::Util;
 use crate::git::{Git, GitSessionState};
-use patch::{Patch};
+use unidiff::PatchSet;
 
 pub fn cmd_populate(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
     let git_dir = options.git_dir.clone().unwrap();
@@ -106,23 +107,40 @@ fn compare_patches(options: &Options, hash1: &String, hash2: &String) -> Result<
 
     let commit1 = Git::show(hash1.as_str(), &git_dir)?;
     let commit2 = Git::show(hash2.as_str(), &git_dir)?;
-    let patch1 = Patch::from_single(&commit1.body).unwrap();
-    let patch2 = Patch::from_single(&commit2.body).unwrap();
 
-    for hunk1 in &patch1.hunks {
-        let mut found = false;
-        for hunk2 in &patch2.hunks {
+    let mut patch1 = PatchSet::new();
+    patch1.parse(commit1.body).ok().expect("Error parsing diff");
 
-            // Compare only the lines and not the ranges since they can vary based on which kernel
-            // base they got applied to
-            if hunk1.lines == hunk2.lines {
-                found = true;
-                break;
-            }
+    let mut patch2 = PatchSet::new();
+    patch2.parse(commit2.body).ok().expect("Error parsing diff");
+
+    if patch1.len() != patch2.len() {
+        return Ok(false);
+    }
+
+    let files1 = patch1.files();
+    let files2 = patch2.files();
+
+    for i in 0..(files1.len() - 1) {
+        let file1 = &files1[i];
+        let file2 = &files2[i];
+
+        if file1.len() != file2.len() {
+            return Ok(false);
         }
 
-        if found == false {
-            return Ok(false);
+        let hunks1 = file1.hunks();
+        let hunks2 = file2.hunks();
+
+        for j in 0..(hunks1.len() - 1) {
+            if hunks1[j].section_header != hunks2[j].section_header {
+                return Ok(false);
+            }
+
+            // We compare the contents of the lines but not the lineno
+            if hunks1[j].lines() != hunks2[j].lines() {
+                return Ok(false);
+            }
         }
     }
 
