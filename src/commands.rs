@@ -503,3 +503,16 @@ pub fn cmd_diff(options: &Options) -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
+
+pub fn cmd_diffstat(options: &Options) -> Result<(), Box<dyn Error>> {
+    let git_dir = options.git_dir.clone().unwrap();
+    let branch = options.branch.clone().unwrap();
+    let range_stop = options.range_stop.clone().unwrap();
+    let paths = options.paths.clone().unwrap();
+
+    let stdout = Git::cmd(format!("diff --stat {branch} {range_stop} -- {paths}").to_string(), &git_dir)?;
+
+    println!("{stdout}");
+
+    Ok(())
+}

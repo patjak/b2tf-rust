@@ -101,6 +101,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         cmd_skip(&options, &mut log)?;
     } else if let Some(_matches) = matches.subcommand_matches("diff") {
         cmd_diff(&options)?;
+    } else if let Some(_matches) = matches.subcommand_matches("diffstat") {
+        cmd_diffstat(&options)?;
     }
 
     Ok(())

@@ -74,6 +74,10 @@ impl Cli {
                     .about("show diff between your branch and <range stop> without diff from branch and <range start>")
             )
             .subcommand(
+                Command::new("diffstat")
+                    .about("show diff stat between your branch and <range stop>")
+            )
+            .subcommand(
                 Command::new("rebase")
                     .about("rebase the commit list")
             )
