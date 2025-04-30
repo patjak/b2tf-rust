@@ -478,15 +478,28 @@ pub fn cmd_diff(options: &Options) -> Result<(), Box<dyn Error>> {
     let range_stop = options.range_stop.clone().unwrap();
     let paths = options.paths.clone().unwrap();
 
-    println!("{}", "Difference between current branch and range-stop".green());
-
     let stdout = Git::cmd(format!("diff {branch} {range_stop} -- {paths}").to_string(), &git_dir)?;
-    println!("{stdout}");
+    let mut patch = PatchSet::new();
+    patch.parse(stdout).ok().expect("Error parsing diff");
 
-    println!("{}", "------------------------------------------------------------".green());
-
-    let stdout = Git::cmd(format!("diff --stat {branch} {range_stop} -- {paths}").to_string(), &git_dir)?;
-    println!("{stdout}");
+    for file in patch {
+        println!("--- {}", file.source_file);
+        println!("+++ {}", file.target_file);
+        for hunk in file {
+            print!("{}", format!("@@ -{},{} ", hunk.source_start, hunk.source_length).cyan());
+            print!("{}", format!("+{},{} @@ ", hunk.target_start, hunk.target_length).cyan());
+            println!("{}", hunk.section_header);
+            for line in hunk {
+                if line.line_type == "+" {
+                    println!("{} {}", line.line_type.green(), line.value.green());
+                } else if line.line_type == "-" {
+                    println!("{} {}", line.line_type.red(), line.value.red());
+                } else {
+                    println!("{} {}", line.line_type, line.value);
+                }
+            }
+        }
+    }
 
     Ok(())
 }
