@@ -21,9 +21,9 @@ pub struct GitSession {
 
 #[derive(Debug, PartialEq)]
 pub enum GitSessionState {
-    NONE,
-    REBASE,
-    CHERRYPICK,
+    None,
+    Rebase,
+    Cherrypick,
 }
 
 impl Git {
@@ -41,7 +41,7 @@ impl Git {
         let stdout = String::from_utf8(output.stdout).expect("Invalid UTF8");
 
         if !output.status.success() {
-            if stdout.len() > 0 {
+            if !stdout.is_empty() {
                 println!("{}", stdout);
             }
 
@@ -67,19 +67,19 @@ impl Git {
 
         for line in lines.iter().skip(2) {
             commit.body.push_str(line);
-            commit.body.push_str("\n");
+            commit.body.push('\n');
         }
 
-        return Ok(commit);
+        Ok(commit)
     }
 
     pub fn get_last_commit(dir: &String) -> Result<String, Box<dyn Error>> {
-        let res = Git::cmd(format!("log --format='%H' -n 1"), &dir);
+        let res = Git::cmd("log --format='%H' -n 1".to_string(), dir);
 
         match res {
-            Ok(commit) => return Ok(commit.trim().to_string()),
-            Err(error) => return Err(error),
-        };
+            Ok(commit) => Ok(commit.trim().to_string()),
+            Err(error) => Err(error),
+        }
     }
 
     pub fn get_branch(dir: &String) -> Result<String, Box<dyn Error>> {
@@ -105,7 +105,7 @@ impl Git {
         let stdout: &str = &Git::cmd("status".to_string(), dir)?;
 
         let mut session: GitSession = GitSession {
-            state:  GitSessionState::NONE,
+            state:  GitSessionState::None,
             unmerged_paths: Git::get_unmerged_paths(stdout)?,
             modified_paths: Git::get_modified_paths(stdout)?,
             unstaged_paths: Git::get_unstaged_paths(stdout)?,
@@ -113,12 +113,12 @@ impl Git {
 
         let lines: Vec<&str> = stdout.split("\n").collect();
         if lines[0].trim() == "interactive rebase in progress" {
-            session.state  = GitSessionState::REBASE;
+            session.state  = GitSessionState::Rebase;
         } else if lines[1].len() > 39 && lines[1][..39].trim() == "You are currently cherry-picking commit" {
-            session.state = GitSessionState::CHERRYPICK;
+            session.state = GitSessionState::Cherrypick;
         }
 
-        if session.state == GitSessionState::CHERRYPICK {
+        if session.state == GitSessionState::Cherrypick {
             let hash: Vec<&str> = stdout.split("You are currently cherry-picking commit ").collect();
             let hash: Vec<&str> = hash[1].split(".").collect();
             let hash = hash[0];
@@ -153,7 +153,7 @@ impl Git {
             }
 
             // Skip invalid lines while paths is empty, then break on first invalid line
-            if col.len() == 1 && col[0] == ""  && paths.len() > 0 {
+            if col.len() == 1 && col[0].is_empty()  && !paths.is_empty() {
                 break;
             }
         }

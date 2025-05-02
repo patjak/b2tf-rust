@@ -36,15 +36,15 @@ impl Options {
         let signature = matches.get_one::<String>("signature").cloned();
         let references = matches.get_one::<String>("patch references").cloned();
 
-        if !range_start.is_none() { self.range_start = range_start }
-        if !range_stop.is_none() { self.range_stop = range_stop }
-        if !branch.is_none() { self.branch = branch }
-        if !branch_point.is_none() { self.branch_point = branch_point }
-        if !work_dir.is_none() { self.work_dir = work_dir }
-        if !git_dir.is_none() { self.git_dir = git_dir }
-        if !paths.is_none() { self.paths = paths }
-        if !signature.is_none() { self.signature = signature }
-        if !references.is_none() { self.references = references }
+        if range_start.is_some() { self.range_start = range_start }
+        if range_stop.is_some() { self.range_stop = range_stop }
+        if branch.is_some() { self.branch = branch }
+        if branch_point.is_some() { self.branch_point = branch_point }
+        if work_dir.is_some() { self.work_dir = work_dir }
+        if git_dir.is_some() { self.git_dir = git_dir }
+        if paths.is_some() { self.paths = paths }
+        if signature.is_some() { self.signature = signature }
+        if references.is_some() { self.references = references }
     }
 
     pub fn parse(&mut self, matches :&ArgMatches, log :&Log) -> Result<(), Box<dyn Error>> {
@@ -54,7 +54,7 @@ impl Options {
         log.parse_config(self)?;
 
         // Parse options from cli
-        self.parse_matches(&matches);
+        self.parse_matches(matches);
 
         Ok(())
     }

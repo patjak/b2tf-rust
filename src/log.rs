@@ -87,12 +87,12 @@ impl Log {
 
             if cols.len() == 1 && cols[0] == upstream_id {
                 commits.push_str(upstream_id);
-                commits.push_str(" ");
+                commits.push(' ');
                 commits.push_str(backport_id);
-                commits.push_str("\n");
+                commits.push('\n');
             } else {
                 commits.push_str(line);
-                commits.push_str("\n");
+                commits.push('\n');
             }
         }
         self.commits = commits;
@@ -109,7 +109,7 @@ impl Log {
             hash = "";
             let line = line.trim();
 
-            if line.len() == 0 { continue; }
+            if line.is_empty() { continue; }
             if &line[0..1] == "#" { continue; }
 
             let rows: Vec<&str> = line.split(" ").collect();
@@ -131,7 +131,7 @@ impl Log {
         for line in lines.iter() {
             let line = line.trim();
 
-            if line.len() == 0 { continue; }
+            if line.is_empty() { continue; }
             if &line[0..1] == "#" { continue; }
 
             let rows: Vec<&str> = line.split(" ").collect();

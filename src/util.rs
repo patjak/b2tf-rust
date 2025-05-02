@@ -17,7 +17,7 @@ impl Util {
             val.pop();
         }
 
-        if val == "" {
+        if val.is_empty() {
             return default.to_string();
         }
 

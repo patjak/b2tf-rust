@@ -102,17 +102,17 @@ fn get_commit_cache(options: &Options) -> Result<Vec<(String, String)>, Box<dyn 
     Ok(cache)
 }
 
-fn compare_patches(options: &Options, hash1: &String, hash2: &String) -> Result<bool, Box<dyn Error>> {
+fn compare_patches(options: &Options, hash1: &str, hash2: &str) -> Result<bool, Box<dyn Error>> {
     let git_dir = options.git_dir.clone().unwrap();
 
-    let commit1 = Git::show(hash1.as_str(), &git_dir)?;
-    let commit2 = Git::show(hash2.as_str(), &git_dir)?;
+    let commit1 = Git::show(hash1, &git_dir)?;
+    let commit2 = Git::show(hash2, &git_dir)?;
 
     let mut patch1 = PatchSet::new();
-    patch1.parse(commit1.body).ok().expect("Error parsing diff");
+    patch1.parse(commit1.body).expect("Error parsing diff");
 
     let mut patch2 = PatchSet::new();
-    patch2.parse(commit2.body).ok().expect("Error parsing diff");
+    patch2.parse(commit2.body).expect("Error parsing diff");
 
     if patch1.len() != patch2.len() {
         return Ok(false);
@@ -151,31 +151,31 @@ fn handle_git_state(options: &Options, log: &mut Log) -> Result<(), Box<dyn Erro
     let git_dir = options.git_dir.clone().unwrap();
     let session = Git::get_session(&git_dir, log)?;
 
-    if session.state == GitSessionState::CHERRYPICK {
+    if session.state == GitSessionState::Cherrypick {
         let log_read = log.clone();
         let next_hash = log_read.next_commit();
 
         // Check for empty commit
-        if session.unmerged_paths.len() == 0 && session.modified_paths.len() == 0 {
+        if session.unmerged_paths.is_empty() && session.modified_paths.is_empty() {
             Git::cmd("cherry-pick --abort".to_string(), &git_dir)?;
             log.commit_update(next_hash, "empty")?;
             return Ok(());
         }
 
         // If we have conflicts then edit them
-        if session.unmerged_paths.len() != 0 {
+        if !session.unmerged_paths.is_empty() {
             cmd_edit(options, log)?;
             return Ok(());
         }
 
         // Check if all conflicts are resolved so we can update log and continue
-        if session.unmerged_paths.len() == 0 && session.modified_paths.len() > 0 {
+        if session.unmerged_paths.is_empty() && !session.modified_paths.is_empty() {
             Git::cmd("cherry-pick --continue".to_string(), &git_dir)?;
             let new_hash = Git::get_last_commit(&git_dir)?;
             log.commit_update(next_hash, &new_hash)?;
             return Ok(());
         }
-    } else if session.state != GitSessionState::NONE {
+    } else if session.state != GitSessionState::None {
         return Err("In session".into());
     }
 
@@ -200,7 +200,7 @@ pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>>
     loop {
         let log_read = log.clone();
         let next_hash = log_read.next_commit();
-        let commit = Git::show(&next_hash, &git_dir)?;
+        let commit = Git::show(next_hash, &git_dir)?;
 
         println!("{} {}/{}: {} {}", "Applying".green(), i, num_commits, next_hash, commit.subject);
         i += 1;
@@ -216,7 +216,7 @@ pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>>
                 cherry_hash = &cherry.0;
             }
 
-            if cherry_hash != "" {
+            if !cherry_hash.is_empty() {
                 println!("{} {}","Found cherry pick:".green(), cherry_hash);
                 is_cherrypick = true;
                 log.commit_update(next_hash, format!("cherry pick {}", cherry_hash).as_str())?;
@@ -262,7 +262,7 @@ pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>>
                 let session = Git::get_session(&git_dir, log)?;
 
                 // If the user didn't fix the conflict we abort
-                if session.unmerged_paths.len() != 0 {
+                if !session.unmerged_paths.is_empty() {
                     return Err("Conflict not resolved".into());
                 }
             },
@@ -271,23 +271,23 @@ pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>>
 }
 
 fn print_session(git_dir: &String, log: &Log) -> Result<(), Box<dyn Error>> {
-    let session = Git::get_session(&git_dir, log)?;
+    let session = Git::get_session(git_dir, log)?;
 
-    if session.modified_paths.len() > 0 {
+    if !session.modified_paths.is_empty() {
         println!("\nChanges to be committed:");
         for path in session.modified_paths.iter() {
             println!("\t{}", path.1.green());
         }
     }
 
-    if session.unmerged_paths.len() > 0 {
+    if !session.unmerged_paths.is_empty() {
         println!("\nUnmerged paths:");
         for path in session.unmerged_paths.iter() {
             println!("\t{}", path.1.red());
         }
     }
 
-    if session.unstaged_paths.len() > 0 {
+    if !session.unstaged_paths.is_empty() {
         println!("\nChanges not staged for commit:");
         for path in session.unstaged_paths.iter() {
             println!("\t{}", path.1.red());
@@ -377,7 +377,7 @@ pub fn cmd_edit(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> 
         }
         let session = Git::get_session(&git_dir, log)?;
 
-        if session.unmerged_paths.len() == 0 && session.modified_paths.len() > 0 {
+        if session.unmerged_paths.is_empty() && !session.modified_paths.is_empty() {
             println!("All conflicts resolved.");
         }
     }
@@ -407,9 +407,9 @@ pub fn cmd_status(options: &Options, log: &Log) -> Result<(), Box<dyn Error>> {
     let session = Git::get_session(&git_dir, log)?;
 
     match session.state {
-        GitSessionState::CHERRYPICK => println!("{}", "Session: Cherry-picking".yellow()),
-        GitSessionState::REBASE => println!("{}", "Session: Rebasing\n".yellow()),
-        GitSessionState::NONE => println!("No session"),
+        GitSessionState::Cherrypick => println!("{}", "Session: Cherry-picking".yellow()),
+        GitSessionState::Rebase => println!("{}", "Session: Rebasing\n".yellow()),
+        GitSessionState::None => println!("No session"),
     }
 
     print_session(&git_dir, log)?;
@@ -442,10 +442,10 @@ pub fn cmd_restart(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error
 
         if cols.len() >= 2 && cols[0].len() == 40 {
             commits.push_str(cols[0]);
-            commits.push_str("\n");
+            commits.push('\n');
         } else {
             commits.push_str(line);
-            commits.push_str("\n");
+            commits.push('\n');
         }
     }
 
@@ -460,7 +460,7 @@ pub fn cmd_skip(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> 
 
     let session = Git::get_session(&git_dir, log)?;
 
-    if session.state == GitSessionState::CHERRYPICK {
+    if session.state == GitSessionState::Cherrypick {
         Git::cmd("cherry-pick --abort".to_string(), &git_dir)?;
     }
 
@@ -480,7 +480,7 @@ pub fn cmd_diff(options: &Options) -> Result<(), Box<dyn Error>> {
 
     let stdout = Git::cmd(format!("diff {branch} {range_stop} -- {paths}").to_string(), &git_dir)?;
     let mut patch = PatchSet::new();
-    patch.parse(stdout).ok().expect("Error parsing diff");
+    patch.parse(stdout).expect("Error parsing diff");
 
     for file in patch {
         println!("--- {}", file.source_file);

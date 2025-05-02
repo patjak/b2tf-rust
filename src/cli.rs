@@ -5,7 +5,7 @@ pub struct Cli {
 
 impl Cli {
     pub fn parse() -> ArgMatches {
-        let matches = command!()
+        command!()
             .name("Back 2 The Future")
             .display_name("b2tf")
             .author("Patrik Jakobsson <patrik.r.jakobsson@gmail.com>")
@@ -81,8 +81,6 @@ impl Cli {
                 Command::new("rebase")
                     .about("rebase the commit list")
             )
-            .get_matches();
-
-        matches
+            .get_matches()
     }
 }
