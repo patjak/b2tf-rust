@@ -112,7 +112,7 @@ impl Git {
         };
 
         let lines: Vec<&str> = stdout.split("\n").collect();
-        if lines[0].trim() == "interactive rebase in progress" {
+        if lines[0].len() > 30  && lines[0][0..30] == *"interactive rebase in progress" {
             session.state  = GitSessionState::Rebase;
         } else if lines[1].len() > 39 && lines[1][..39].trim() == "You are currently cherry-picking commit" {
             session.state = GitSessionState::Cherrypick;
