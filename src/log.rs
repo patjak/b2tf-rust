@@ -85,7 +85,7 @@ impl Log {
         for line in lines.iter() {
             let cols: Vec<&str> = line.trim().split(" ").collect();
 
-            if cols.len() == 1 && cols[0] == upstream_id {
+            if cols[0] == upstream_id {
                 commits.push_str(upstream_id);
                 commits.push(' ');
                 commits.push_str(backport_id);
