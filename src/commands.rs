@@ -408,8 +408,8 @@ pub fn cmd_status(options: &Options, log: &Log) -> Result<(), Box<dyn Error>> {
 
     let next_index = log.next_index();
     let num_commits = log.num_commits()?;
-    let percentage = (next_index / num_commits) * 100;
-    println!("Progress {}% ({}/{})", percentage, next_index, num_commits);
+    let percentage: f32 = ((next_index as f32) / (num_commits as f32)) * 100.0;
+    println!("Progress {:.0}% ({}/{})", percentage, next_index, num_commits);
 
     let stdout = Git::cmd(format!("diff --stat {branch} {range_stop} -- {paths}"), &git_dir)?;
     let lines: Vec<&str> = stdout.split("\n").collect();
