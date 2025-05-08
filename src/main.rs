@@ -103,6 +103,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         cmd_diff(&options)?;
     } else if let Some(_matches) = matches.subcommand_matches("diffstat") {
         cmd_diffstat(&options)?;
+    } else if let Some(_matche) = matches.subcommand_matches("rebase") {
+        cmd_rebase(&options, &mut log)?;
     }
 
     Ok(())

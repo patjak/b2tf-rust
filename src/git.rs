@@ -51,6 +51,18 @@ impl Git {
         Ok(stdout)
     }
 
+    pub fn cmd_passthru(query: String, dir: &String) -> Result<bool, Box<dyn Error>> {
+        let query = format!("git -C {} {}", dir, query);
+
+        let status = Command::new("sh")
+            .arg("-c")
+            .arg(&query)
+            .status()
+            .expect(format!("Failed to execute: {}\n", &query).as_str());
+
+        Ok(status.success())
+    }
+
     pub fn show(hash: &str, dir: &String) -> Result<Commit, Box<dyn Error>> {
 
         let mut commit = Commit {

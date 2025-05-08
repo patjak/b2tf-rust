@@ -2,6 +2,8 @@ extern crate unidiff;
 use std::process::Command;
 use std::error::Error;
 use std::path::Path;
+use std::fs;
+use std::io::Write;
 use colored::Colorize;
 use crate::Options;
 use crate::Log;
@@ -174,6 +176,16 @@ fn handle_git_state(options: &Options, log: &mut Log) -> Result<(), Box<dyn Erro
             Git::cmd("cherry-pick --continue".to_string(), &git_dir)?;
             let new_hash = Git::get_last_commit(&git_dir)?;
             log.commit_update(next_hash, &new_hash)?;
+            return Ok(());
+        }
+    } else if session.state == GitSessionState::Rebase {
+        if session.unmerged_paths.is_empty() && !session.modified_paths.is_empty() {
+            Git::cmd_passthru("rebase --continue".to_string(), &git_dir)?;
+        }
+
+        // If we have conflicts then edit them
+        if !session.unmerged_paths.is_empty() {
+            cmd_edit(options, log)?;
             return Ok(());
         }
     } else if session.state != GitSessionState::None {
@@ -514,6 +526,94 @@ pub fn cmd_diffstat(options: &Options) -> Result<(), Box<dyn Error>> {
     let stdout = Git::cmd(format!("diff --stat {branch} {range_stop} -- {paths}").to_string(), &git_dir)?;
 
     println!("{stdout}");
+
+    Ok(())
+}
+
+pub fn cmd_rebase(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
+    let git_dir = options.git_dir.clone().unwrap();
+    let range_start = options.range_start.clone().unwrap();
+    let commits = log.get_all()?;
+    let last_commit = log.last_applied_commit()?;
+    let temp_file = Temp::new_file()?;
+    let pathbuf = temp_file.to_path_buf();
+    let filename = pathbuf.as_os_str().to_str().unwrap();
+    let mut file = fs::File::create(&temp_file)?;
+    let session = Git::get_session(&git_dir, log)?;
+
+    if session.state == GitSessionState::None {
+        for hash in commits {
+            let mut picked_hash = &hash.0;
+
+            if hash.1.len() == 40 {
+                // If the commit is already backported we pick that hash
+                picked_hash = &hash.1;
+            } else if hash.1.len() > 0 {
+                // Skip all empty/duplicates/cherry-picks etc.
+                continue;
+            }
+
+            file.write_all(format!("pick {}\n", picked_hash).as_bytes())?;
+
+            if hash.0 == last_commit {
+                break;
+            }
+        }
+
+        let query = format!("GIT_SEQUENCE_EDITOR='cp {} ' git -C {} rebase -i {}", filename, git_dir, range_start);
+
+        Command::new("sh")
+            .arg("-c")
+            .arg(&query)
+            .status()
+            .expect(format!("Failed to execute: {}\n", &query).as_str());
+    }
+
+    if session.state != GitSessionState::Rebase && session.state != GitSessionState::None {
+        return Err("Invalid session state.".into());
+    }
+
+    loop {
+        let session = Git::get_session(&git_dir, log)?;
+        if session.state == GitSessionState::None {
+            break;
+        }
+        handle_git_state(options, log)?;
+    }
+
+    // Rebase succeeded. Now rebuild the commit list
+    println!("");
+    let stdout = Git::cmd(format!("log --oneline --reverse --format='%H %s' {}..", range_start), &git_dir)?;
+    let lines: Vec<&str> = stdout.split("\n").collect();
+    let commits = log.get_all()?;
+
+    let mut j: usize = 0;
+    for i in 0..(commits.len() - 1) {
+        // Skip everything that is not a backported commit
+        if commits[i].0.len() != 40 || commits[i].1.len() != 40 {
+            continue;
+        }
+
+        let commit = Git::show(&commits[i].0, &git_dir)?;
+        let hash_up = commit.hash;
+        let subject_up = commit.subject;
+
+        let mut cols: Vec<&str> = lines[j].split(" ").collect();
+
+        let hash_down = &cols.remove(0);
+        let subject_down = cols.join(" ");
+
+        if subject_down != subject_up {
+            return Err(format!("Log is out of sync with git repository at:\nGit: {} {}\nLog: {} {}",
+                               hash_up, subject_up, hash_down, subject_down).into());
+        }
+
+        j += 1;
+        print!("\rUpdating log: {}/{}", j, lines.len() - 1);
+        log.commit_update(&hash_up, &hash_down)?;
+    }
+
+    println!("\nRebase done");
 
     Ok(())
 }

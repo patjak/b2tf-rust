@@ -77,6 +77,33 @@ impl Log {
         Ok(())
     }
 
+    // Returns all the commits as a vector of tuples with any backport information attached
+    pub fn get_all(&self) -> Result<Vec<(String, String)>, Box<dyn Error>> {
+        let lines: Vec<&str> = self.commits.split("\n").collect();
+        let mut commits = String::from("");
+
+        let mut list: Vec<(String, String)> = vec![];
+
+        for line in lines.iter() {
+            let mut cols: Vec<&str> = line.trim().split(" ").collect();
+            if !cols.is_empty() {
+                if cols[0].len() == 40 {
+                    let hash_upstream = cols[0];
+                    let mut hash_backport = "".to_string();
+
+                    if cols.len() > 1 {
+                        cols.remove(0);
+
+                        hash_backport = cols.join(" ");
+                    }
+                    list.push((hash_upstream.to_string(), hash_backport.to_string()));
+                }
+            }
+        }
+
+        Ok(list)
+    }
+
     // Update backport id for upstream id in the log
     pub fn commit_update(&mut self, upstream_id: &str, backport_id: &str) -> Result<(), Box<dyn Error>> {
         let lines: Vec<&str> = self.commits.split("\n").collect();
@@ -160,5 +187,29 @@ impl Log {
         }
 
         Ok(num)
+    }
+
+    // Returns the last commit in the list that has been backported
+    pub fn last_applied_commit(&self) -> Result<String, Box<dyn Error>> {
+        let lines: Vec<&str> = self.commits.split("\n").collect();
+        let mut last_applied = String::new();
+
+        for line in lines.iter() {
+            let cols: Vec<&str> = line.split(" ").collect();
+
+            if cols.len() != 2 {
+                continue;
+            }
+
+            if cols[0].len() == 40 && cols[1].len() == 40 {
+                last_applied = cols[0].to_string();
+            }
+        }
+
+        if last_applied.is_empty() {
+            return Err("No last applied commit found".into());
+        }
+
+        Ok(last_applied)
     }
 }
