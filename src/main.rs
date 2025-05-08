@@ -62,7 +62,7 @@ impl Options {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut log = Log {
-        filename: String::from("commits.log"),
+        filename: String::from("b2tf.log"),
         config: String::from(""),
         commits: String::from("")
     };
