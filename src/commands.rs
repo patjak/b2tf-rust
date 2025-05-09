@@ -150,7 +150,8 @@ fn compare_patches(options: &Options, hash1: &str, hash2: &str) -> Result<bool, 
     Ok(true)
 }
 
-fn handle_git_state(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
+// Returns true if a patch was applied
+fn handle_git_state(options: &Options, log: &mut Log) -> Result<bool, Box<dyn Error>> {
     let git_dir = options.git_dir.clone().unwrap();
     let session = Git::get_session(&git_dir, log)?;
 
@@ -162,13 +163,13 @@ fn handle_git_state(options: &Options, log: &mut Log) -> Result<(), Box<dyn Erro
         if session.unmerged_paths.is_empty() && session.modified_paths.is_empty() {
             Git::cmd("cherry-pick --abort".to_string(), &git_dir)?;
             log.commit_update(next_hash, "empty")?;
-            return Ok(());
+            return Ok(false);
         }
 
         // If we have conflicts then edit them
         if !session.unmerged_paths.is_empty() {
             cmd_edit(options, log)?;
-            return Ok(());
+            return Ok(false);
         }
 
         // Check if all conflicts are resolved so we can update log and continue
@@ -176,7 +177,7 @@ fn handle_git_state(options: &Options, log: &mut Log) -> Result<(), Box<dyn Erro
             Git::cmd("cherry-pick --continue".to_string(), &git_dir)?;
             let new_hash = Git::get_last_commit(&git_dir)?;
             log.commit_update(next_hash, &new_hash)?;
-            return Ok(());
+            return Ok(true);
         }
     } else if session.state == GitSessionState::Rebase {
         if session.unmerged_paths.is_empty() && !session.modified_paths.is_empty() {
@@ -186,13 +187,13 @@ fn handle_git_state(options: &Options, log: &mut Log) -> Result<(), Box<dyn Erro
         // If we have conflicts then edit them
         if !session.unmerged_paths.is_empty() {
             cmd_edit(options, log)?;
-            return Ok(());
+            return Ok(false);
         }
     } else if session.state != GitSessionState::None {
         return Err("In session".into());
     }
 
-    Ok(())
+    Ok(false)
 }
 
 pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
@@ -270,7 +271,9 @@ pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>>
                     continue;
                 }
 
-                handle_git_state(options, log)?;
+                if !handle_git_state(options, log)? {
+                    i -= 1;
+                }
 
                 let session = Git::get_session(&git_dir, log)?;
 
