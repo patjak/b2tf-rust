@@ -216,6 +216,10 @@ pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>>
         let next_hash = log_read.next_commit();
         let commit = Git::show(next_hash, &git_dir)?;
 
+        if next_hash.is_empty() {
+            break Ok(());
+        }
+
         println!("{} {}/{}: {} {}", "Applying".green(), i, num_commits, next_hash, commit.subject);
         i += 1;
 
