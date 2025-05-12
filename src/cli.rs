@@ -89,6 +89,14 @@ impl Cli {
                     )
 
             )
+            .subcommand(
+                Command::new("append")
+                    .about("add commit hash to end of log")
+                    .arg(Arg::new("hashes to append")
+                        .long("hash")
+                    )
+
+            )
             .get_matches()
     }
 }

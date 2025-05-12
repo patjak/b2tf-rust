@@ -651,3 +651,30 @@ pub fn cmd_prepend(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error
 
     Ok(())
 }
+
+pub fn cmd_append(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
+    let git_dir = options.git_dir.clone().unwrap();
+    let hash_arg;
+
+    match &options.hash {
+        Some(arg) => hash_arg = arg,
+        None => return Err("No --hash was provided".into()),
+    };
+
+    // Create a string to append to the commits log
+    let mut append = String::new();
+
+    let hashes: Vec<&str> = hash_arg.split(" ").collect();
+    for hash in hashes {
+        let commit = Git::show(hash, &git_dir)?;
+        append.push_str(format!("# {}\n{}\n\n", commit.subject, commit.hash).as_str());
+    }
+
+    log.commits.push_str(append.as_str());
+    log.save()?;
+
+    println!("Commits appended:\n");
+    print!("{}", append);
+
+    Ok(())
+}

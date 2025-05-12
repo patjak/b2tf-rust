@@ -43,6 +43,12 @@ impl Options {
             if hash.is_some() { self.hash = hash }
         }
 
+        let append_matches = matches.subcommand_matches("append");
+        if append_matches.is_some() {
+            let hash = append_matches.unwrap().get_one::<String>("hashes to append").cloned();
+            if hash.is_some() { self.hash = hash }
+        }
+
         if range_start.is_some() { self.range_start = range_start }
         if range_stop.is_some() { self.range_stop = range_stop }
         if branch.is_some() { self.branch = branch }
@@ -115,6 +121,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         cmd_rebase(&options, &mut log)?;
     } else if let Some(_matches) = matches.subcommand_matches("prepend") {
         cmd_prepend(&options, &mut log)?;
+    } else if let Some(_matches) = matches.subcommand_matches("append") {
+        cmd_append(&options, &mut log)?;
     }
 
     Ok(())
