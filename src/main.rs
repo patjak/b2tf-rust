@@ -22,6 +22,7 @@ pub struct Options {
     pub paths:          Option<String>,
     pub signature:      Option<String>,
     pub references:     Option<String>,
+    pub hash:           Option<String>,
 }
 
 impl Options {
@@ -35,6 +36,12 @@ impl Options {
         let paths = matches.get_one::<String>("paths").cloned();
         let signature = matches.get_one::<String>("signature").cloned();
         let references = matches.get_one::<String>("patch references").cloned();
+
+        let prepend_matches = matches.subcommand_matches("prepend");
+        if prepend_matches.is_some() {
+            let hash = prepend_matches.unwrap().get_one::<String>("hashes to prepend").cloned();
+            if hash.is_some() { self.hash = hash }
+        }
 
         if range_start.is_some() { self.range_start = range_start }
         if range_stop.is_some() { self.range_stop = range_stop }
@@ -79,6 +86,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         paths: None,
         signature: None,
         references: None,
+        hash: None,
     };
 
     options.parse(&matches, &log)?;
@@ -103,8 +111,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         cmd_diff(&options)?;
     } else if let Some(_matches) = matches.subcommand_matches("diffstat") {
         cmd_diffstat(&options)?;
-    } else if let Some(_matche) = matches.subcommand_matches("rebase") {
+    } else if let Some(_matches) = matches.subcommand_matches("rebase") {
         cmd_rebase(&options, &mut log)?;
+    } else if let Some(_matches) = matches.subcommand_matches("prepend") {
+        cmd_prepend(&options, &mut log)?;
     }
 
     Ok(())

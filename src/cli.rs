@@ -81,6 +81,14 @@ impl Cli {
                 Command::new("rebase")
                     .about("rebase the commit list")
             )
+            .subcommand(
+                Command::new("prepend")
+                    .about("add commit hash to beginning of log")
+                    .arg(Arg::new("hashes to prepend")
+                        .long("hash")
+                    )
+
+            )
             .get_matches()
     }
 }

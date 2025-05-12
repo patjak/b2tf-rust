@@ -29,8 +29,8 @@ pub fn cmd_populate(options: &Options, log: &mut Log) -> Result<(), Box<dyn Erro
             continue;
         }
 
-        let subject = format!("\n# {}\n", &line[41..]);
-        let hash = format!("{}\n", &line[0..40]);
+        let subject = format!("# {}\n", &line[41..]);
+        let hash = format!("{}\n\n", &line[0..40]);
 
         commits.push_str(subject.as_str());
         commits.push_str(hash.as_str());
@@ -621,6 +621,33 @@ pub fn cmd_rebase(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>
     }
 
     println!("\nRebase done");
+
+    Ok(())
+}
+
+pub fn cmd_prepend(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
+    let git_dir = options.git_dir.clone().unwrap();
+    let hash_arg;
+
+    match &options.hash {
+        Some(arg) => hash_arg = arg,
+        None => return Err("No --hash was provided".into()),
+    };
+
+    // Create a string to prepend to the commits log
+    let mut prepend = String::new();
+
+    let hashes: Vec<&str> = hash_arg.split(" ").collect();
+    for hash in hashes {
+        let commit = Git::show(hash, &git_dir)?;
+        prepend.push_str(format!("# {}\n{}\n\n", commit.subject, commit.hash).as_str());
+    }
+
+    log.commits.insert_str(0, prepend.as_str());
+    log.save()?;
+
+    println!("Commits prepended:\n");
+    print!("{}", prepend);
 
     Ok(())
 }
