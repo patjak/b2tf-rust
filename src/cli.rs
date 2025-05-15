@@ -97,6 +97,16 @@ impl Cli {
                     )
 
             )
+            .subcommand(
+                Command::new("insert")
+                    .about("insert hashes before or after specified hash")
+                    .arg(Arg::new("hashes to append")
+                        .long("hash")
+                    )
+                    .arg(Arg::new("insert after this hash")
+                        .long("after")
+                    )
+            )
             .get_matches()
     }
 }

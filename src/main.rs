@@ -23,6 +23,7 @@ pub struct Options {
     pub signature:      Option<String>,
     pub references:     Option<String>,
     pub hash:           Option<String>,
+    pub after:          Option<String>,
 }
 
 impl Options {
@@ -47,6 +48,15 @@ impl Options {
         if append_matches.is_some() {
             let hash = append_matches.unwrap().get_one::<String>("hashes to append").cloned();
             if hash.is_some() { self.hash = hash }
+        }
+
+        let insert_matches = matches.subcommand_matches("insert");
+        if insert_matches.is_some() {
+            let hash = insert_matches.unwrap().get_one::<String>("hashes to append").cloned();
+            if hash.is_some() { self.hash = hash }
+
+            let after = insert_matches.unwrap().get_one::<String>("insert after this hash").cloned();
+            if after.is_some() { self.after = after }
         }
 
         if range_start.is_some() { self.range_start = range_start }
@@ -93,6 +103,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         signature: None,
         references: None,
         hash: None,
+        after: None,
     };
 
     options.parse(&matches, &log)?;
@@ -123,6 +134,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         cmd_prepend(&options, &mut log)?;
     } else if let Some(_matches) = matches.subcommand_matches("append") {
         cmd_append(&options, &mut log)?;
+    } else if let Some(_matches) = matches.subcommand_matches("insert") {
+        cmd_insert(&options, &mut log)?;
     }
 
     Ok(())

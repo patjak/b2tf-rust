@@ -678,3 +678,56 @@ pub fn cmd_append(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>
 
     Ok(())
 }
+
+pub fn cmd_insert(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
+    let git_dir = options.git_dir.clone().unwrap();
+    let hash_arg;
+    let mut after = String::new();
+
+    match &options.hash {
+        Some(arg) => hash_arg = arg,
+        None => return Err("No --hash was provided".into()),
+    };
+
+    match &options.after {
+        Some(arg) => after = arg.to_string(),
+        None => (),
+    };
+
+    if after.is_empty() {
+        return Err("Argument --after must be specified".into());
+    }
+
+    let mut insert = String::new();
+
+    let hashes: Vec<&str> = hash_arg.split(" ").collect();
+    for hash in hashes {
+        let commit = Git::show(hash, &git_dir)?;
+        insert.push_str(format!("# {}\n{}\n\n", commit.subject, commit.hash).as_str());
+    }
+
+    let mut commits = String::new();
+
+    let lines: Vec<&str> = log.commits.split("\n").collect();
+    for line in lines {
+        let line = line.trim();
+
+        let cols: Vec<&str> = line.split(" ").collect();
+        if (cols.len() == 1 && cols[0] == after) ||
+           (cols.len() == 2 && (cols[0] == after || cols[1] == after)) {
+                commits.push_str(&line);
+                commits.push_str("\n\n");
+                commits.push_str(insert.as_str()); // Insert after
+            continue;
+        }
+        commits.push_str(&line);
+        commits.push_str("\n");
+    }
+
+    log.commits = commits;
+    log.save()?;
+
+    println!("Inserted the following commits:\n{}", insert);
+
+    Ok(())
+}
