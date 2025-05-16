@@ -12,6 +12,14 @@ pub struct Log {
 }
 
 impl Log {
+    pub fn new() -> Log {
+        Log {
+            filename: String::from("b2tf.log"),
+            config: String::from(""),
+            commits: String::from("")
+        }
+    }
+
     pub fn load(&mut self) -> Result<(), Box<dyn Error>>  {
         let contents: String = fs::read_to_string(&self.filename)?.parse()?;
         let slices: Vec<&str> = contents.split("\n---\n").collect();

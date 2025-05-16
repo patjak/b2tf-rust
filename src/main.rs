@@ -100,12 +100,7 @@ impl Options {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let mut log = Log {
-        filename: String::from("b2tf.log"),
-        config: String::from(""),
-        commits: String::from("")
-    };
-
+    let mut log = Log::new();
     log.load()?;
     let matches = Cli::parse();
     let mut options = Options::new();
