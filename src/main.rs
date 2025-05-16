@@ -27,6 +27,22 @@ pub struct Options {
 }
 
 impl Options {
+    pub fn new() -> Options {
+        Options {
+            range_start: None,
+            range_stop:  None,
+            branch: None,
+            branch_point: None,
+            work_dir: None,
+            git_dir: None,
+            paths: None,
+            signature: None,
+            references: None,
+            hash: None,
+            after: None,
+        }
+    }
+
     pub fn parse_matches(&mut self, matches: &ArgMatches) {
         let range_start = matches.get_one::<String>("first commit").cloned();
         let range_stop = matches.get_one::<String>("last commit").cloned();
@@ -92,19 +108,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     log.load()?;
     let matches = Cli::parse();
-    let mut options = Options {
-        range_start: None,
-        range_stop:  None,
-        branch: None,
-        branch_point: None,
-        work_dir: None,
-        git_dir: None,
-        paths: None,
-        signature: None,
-        references: None,
-        hash: None,
-        after: None,
-    };
+    let mut options = Options::new();
 
     options.parse(&matches, &log)?;
 
