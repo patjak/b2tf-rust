@@ -111,6 +111,28 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("Options: {:?}", options);
     }
 
+    // Check for all required options
+    if options.range_start.is_none() {
+        return Err("Missing option: range-start".into());
+    }
+    if options.range_stop.is_none() {
+        return Err("Missing option: range-stop".into());
+    }
+    if options.branch.is_none() {
+        return Err("Missing option: branch".into());
+    }
+    if options.git_dir.is_none() {
+        return Err("Missing option: git-dir".into());
+    }
+
+    // Set defaults to missing options
+    if options.work_dir.is_none() {
+        options.work_dir = Some("./".to_string());
+    }
+    if options.paths.is_none() {
+        options.paths = Some("/".to_string());
+    }
+
     if let Some(_matches) = matches.subcommand_matches("populate") {
         cmd_populate(&options, &mut log)?;
     } else if let Some(_matches) = matches.subcommand_matches("apply") {
