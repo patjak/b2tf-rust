@@ -42,6 +42,10 @@ impl Cli {
             )
 
             .subcommand(
+                Command::new("setup")
+                    .about("create b2tf.log file with supplied options")
+            )
+            .subcommand(
                 Command::new("populate")
                     .about("populate the commits list from commits inside range")
             )

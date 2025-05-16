@@ -7,7 +7,7 @@ use crate::log::*;
 use crate::cli::*;
 use crate::commands::*;
 use crate::util::*;
-use clap::{ArgMatches};
+use clap::ArgMatches;
 use std::fmt::Debug;
 use std::error::Error;
 
@@ -101,8 +101,13 @@ impl Options {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut log = Log::new();
-    log.load()?;
+
     let matches = Cli::parse();
+    if let Some(_matches) = matches.subcommand_matches("setup") {
+        cmd_setup(&matches)?;
+    }
+
+    log.load()?;
     let mut options = Options::new();
 
     options.parse(&matches, &log)?;

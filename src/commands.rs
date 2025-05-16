@@ -4,6 +4,7 @@ use std::error::Error;
 use std::path::Path;
 use std::fs;
 use std::io::Write;
+use clap::ArgMatches;
 use colored::Colorize;
 use crate::Options;
 use crate::Log;
@@ -11,6 +12,55 @@ use crate::Util;
 use crate::git::{Git, GitSessionState};
 use unidiff::PatchSet;
 use mktemp::Temp;
+
+pub fn cmd_setup(matches: &ArgMatches) -> Result<(), Box<dyn Error>> {
+    let mut options = Options::new();
+    let mut log = Log::new();
+
+    if fs::exists(&log.filename)? {
+        return Err("b2tf.log already exists. Will not overwrite an existing configuration.".into());
+    }
+
+    options.parse_matches(matches);
+
+    if options.range_start.is_some() {
+        log.config.push_str(format!("range-start: {}\n", &options.range_start.unwrap()).as_str());
+    } else {
+        return Err("--range-start must be specified".into());
+    }
+    if options.range_stop.is_some() {
+        log.config.push_str(format!("range-stop: {}\n", &options.range_stop.unwrap()).as_str());
+    } else {
+        return Err("--range-stop must be specified".into());
+    }
+    if options.branch.is_some() {
+        log.config.push_str(format!("branch: {}\n", &options.branch.unwrap()).as_str());
+    } else {
+        return Err("--branch must be specified".into());
+    }
+    if options.branch_point.is_some() {
+        log.config.push_str(format!("branch-point: {}\n", &options.branch_point.unwrap()).as_str());
+    }
+    if options.work_dir.is_some() {
+        log.config.push_str(format!("work-dir: {}\n", &options.work_dir.unwrap()).as_str());
+    }
+    if options.git_dir.is_some() {
+        log.config.push_str(format!("git-dir: {}\n", &options.git_dir.unwrap()).as_str());
+    } else {
+        return Err("--git-dir must be specified.".into());
+    }
+    if options.paths.is_some() {
+        log.config.push_str(format!("paths: {}\n", &options.paths.unwrap()).as_str());
+    }
+    if options.signature.is_some() {
+        log.config.push_str(format!("signature: {}\n", &options.signature.unwrap()).as_str());
+    }
+    if options.references.is_some() {
+        log.config.push_str(format!("references: {}\n", &options.references.unwrap()).as_str());
+    }
+
+    log.save()
+}
 
 pub fn cmd_populate(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
     let git_dir = options.git_dir.clone().unwrap();
