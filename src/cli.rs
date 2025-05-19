@@ -1,10 +1,10 @@
-use clap::{command, Arg, ArgAction, ArgMatches, Command};
+use clap::{command, Arg, ArgAction, Command};
 
 pub struct Cli {
 }
 
 impl Cli {
-    pub fn parse() -> ArgMatches {
+    pub fn parse() -> Command {
         command!()
             .name("Back 2 The Future")
             .display_name("b2tf")
@@ -111,6 +111,25 @@ impl Cli {
                         .long("after")
                     )
             )
-            .get_matches()
+            .subcommand(
+                Command::new("suse")
+                    .about("SUSE specific subcommands")
+                    .subcommand(
+                        Command::new("export")
+                            .about("export all commits as SUSE patch files")
+                    )
+                    .subcommand(
+                        Command::new("unblacklist")
+                            .about("remove blacklists for patches we are backporting")
+                    )
+                    .subcommand(
+                        Command::new("replace")
+                            .about("choose existing patches to keep/remove/update/replace")
+                    )
+                    .subcommand(
+                        Command::new("apply")
+                            .about("apply all patches to the SUSE tree")
+                    )
+            )
     }
 }

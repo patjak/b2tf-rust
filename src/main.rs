@@ -3,10 +3,12 @@ mod cli;
 mod commands;
 mod git;
 mod util;
+mod suse;
 use crate::log::*;
 use crate::cli::*;
 use crate::commands::*;
 use crate::util::*;
+use crate::suse::cmd_suse;
 use clap::ArgMatches;
 use std::fmt::Debug;
 use std::error::Error;
@@ -102,7 +104,8 @@ impl Options {
 fn main() -> Result<(), Box<dyn Error>> {
     let mut log = Log::new();
 
-    let matches = Cli::parse();
+    let mut command = Cli::parse();
+    let matches = command.clone().get_matches();
     if let Some(_matches) = matches.subcommand_matches("setup") {
         cmd_setup(&matches)?;
     }
@@ -164,6 +167,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         cmd_append(&options, &mut log)?;
     } else if let Some(_matches) = matches.subcommand_matches("insert") {
         cmd_insert(&options, &mut log)?;
+    } else if let Some(suse_matches) = matches.subcommand_matches("suse") {
+        let subcommand = command.find_subcommand_mut("suse").unwrap();
+        cmd_suse(&options, log, subcommand, suse_matches)?;
+    } else {
+        let _ = command.print_help();
     }
 
     Ok(())
