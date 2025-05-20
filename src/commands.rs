@@ -248,12 +248,9 @@ fn handle_git_state(options: &Options, log: &mut Log) -> Result<bool, Box<dyn Er
 
 pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
     let git_dir = options.git_dir.clone().unwrap();
-    let branch = options.branch.clone().unwrap();
     let log_read = log.clone();
     let mut i: u32 = log_read.next_index();
     let num_commits = log_read.num_commits()?;
-
-    Git::set_branch(&branch, &git_dir)?;
 
     let cherrypick_cache = get_cherrypick_cache(options)?;
     let commit_cache = get_commit_cache(options)?;
@@ -460,8 +457,6 @@ pub fn cmd_status(options: &Options, log: &Log) -> Result<(), Box<dyn Error>> {
     let branch = options.branch.clone().unwrap();
     let paths = options.paths.clone().unwrap();
     let range_stop = options.range_stop.clone().unwrap();
-
-    Git::set_branch(&branch, &git_dir)?;
 
     let next_index = log.next_index();
     let num_commits = log.num_commits()?;

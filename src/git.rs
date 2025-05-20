@@ -101,16 +101,35 @@ impl Git {
         Ok(branch)
     }
 
-    pub fn set_branch(branch: &String, dir: &String) -> Result<(), Box<dyn Error>> {
+    pub fn set_branch(branch: &String, branch_point: &String, dir: &String) -> Result<(), Box<dyn Error>> {
         let current_branch = Git::get_branch(dir)?;
 
         if current_branch.trim() == *branch {
             return Ok(())
         }
 
+        if !Git::branch_exists(branch, dir)? {
+            println!("Branch {} doesn't exist. Creating branch {} from point {}...", branch, branch, branch_point);
+            Git::cmd(format!("checkout -b {} {}", branch, branch_point), dir)?;
+            return Ok(());
+        }
+
         Git::cmd(format!("checkout {branch}"), dir)?;
 
         Ok(())
+    }
+
+    pub fn branch_exists(branch: &String, dir: &String) -> Result<bool, Box<dyn Error>> {
+        let status = Command::new("sh")
+            .arg(format!("git -C {} rev-parse --verify {}", dir, branch))
+            .status()
+            .expect("Failed to check if branch exists");
+
+        if status.success() {
+            return Ok(true);
+        }
+
+        Ok(false)
     }
 
     pub fn get_session(dir: &String, log: &Log) -> Result<GitSession, Box<dyn Error>> {

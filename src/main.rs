@@ -9,6 +9,7 @@ use crate::cli::*;
 use crate::commands::*;
 use crate::util::*;
 use crate::suse::cmd_suse;
+use crate::git::*;
 use clap::ArgMatches;
 use std::fmt::Debug;
 use std::error::Error;
@@ -140,6 +141,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     if options.paths.is_none() {
         options.paths = Some("/".to_string());
     }
+    if options.branch_point.is_none() {
+        options.branch_point = options.range_start.clone();
+    }
+
+    Git::set_branch(&options.branch.clone().unwrap(),
+                    &options.branch_point.clone().unwrap(),
+                    &options.git_dir.clone().unwrap())?;
 
     if let Some(_matches) = matches.subcommand_matches("populate") {
         cmd_populate(&options, &mut log)?;
