@@ -6,8 +6,8 @@ pub struct Cli {
 impl Cli {
     pub fn parse() -> Command {
         command!()
-            .name("Back 2 The Future")
-            .display_name("b2tf")
+            .name("b2tf")
+            .display_name("Back 2 The Future")
             .author("Patrik Jakobsson <patrik.r.jakobsson@gmail.com>")
             .arg(Arg::new("debug")
                 .long("debug")
