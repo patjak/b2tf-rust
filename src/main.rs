@@ -54,8 +54,6 @@ impl Options {
         let work_dir = matches.get_one::<String>("work directory").cloned();
         let git_dir = matches.get_one::<String>("git directory").cloned();
         let paths = matches.get_one::<String>("paths").cloned();
-        let signature = matches.get_one::<String>("signature").cloned();
-        let references = matches.get_one::<String>("patch references").cloned();
 
         let prepend_matches = matches.subcommand_matches("prepend");
         if prepend_matches.is_some() {
@@ -85,8 +83,6 @@ impl Options {
         if work_dir.is_some() { self.work_dir = work_dir }
         if git_dir.is_some() { self.git_dir = git_dir }
         if paths.is_some() { self.paths = paths }
-        if signature.is_some() { self.signature = signature }
-        if references.is_some() { self.references = references }
     }
 
     pub fn parse(&mut self, matches :&ArgMatches, log :&Log) -> Result<(), Box<dyn Error>> {
@@ -177,7 +173,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         cmd_insert(&options, &mut log)?;
     } else if let Some(suse_matches) = matches.subcommand_matches("suse") {
         let subcommand = command.find_subcommand_mut("suse").unwrap();
-        cmd_suse(&options, log, subcommand, suse_matches)?;
+        cmd_suse(&mut options, &log, subcommand, suse_matches)?;
     } else {
         let _ = command.print_help();
     }

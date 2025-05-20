@@ -34,13 +34,6 @@ impl Cli {
             .arg(Arg::new("paths")
                 .long("paths")
             )
-            .arg(Arg::new("signature")
-                .long("signature")
-            )
-            .arg(Arg::new("patch references")
-                .long("references")
-            )
-
             .subcommand(
                 Command::new("setup")
                     .about("create b2tf.log file with supplied options")
@@ -91,7 +84,6 @@ impl Cli {
                     .arg(Arg::new("hashes to prepend")
                         .long("hash")
                     )
-
             )
             .subcommand(
                 Command::new("append")
@@ -99,7 +91,6 @@ impl Cli {
                     .arg(Arg::new("hashes to append")
                         .long("hash")
                     )
-
             )
             .subcommand(
                 Command::new("insert")
@@ -114,6 +105,12 @@ impl Cli {
             .subcommand(
                 Command::new("suse")
                     .about("SUSE specific subcommands")
+                    .arg(Arg::new("signature")
+                        .long("signature")
+                    )
+                    .arg(Arg::new("patch references")
+                        .long("references")
+                    )
                     .subcommand(
                         Command::new("export")
                             .about("export all commits as SUSE patch files")
