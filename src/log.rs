@@ -79,6 +79,9 @@ impl Log {
 
             } else if name == "references" {
                 options.references = Some(value.to_string());
+
+            } else if name == "suse-kernel-source" {
+                options.kernel_source = Some(value.to_string());
             }
         };
 

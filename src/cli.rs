@@ -111,6 +111,9 @@ impl Cli {
                     .arg(Arg::new("patch references")
                         .long("references")
                     )
+                    .arg(Arg::new("Path to SUSE kernel-source")
+                        .long("suse-kernel-source")
+                    )
                     .subcommand(
                         Command::new("export")
                             .about("export all commits as SUSE patch files")

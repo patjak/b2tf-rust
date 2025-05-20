@@ -25,6 +25,7 @@ pub struct Options {
     pub paths:          Option<String>,
     pub signature:      Option<String>,
     pub references:     Option<String>,
+    pub kernel_source:  Option<String>,
     pub hash:           Option<String>,
     pub after:          Option<String>,
 }
@@ -41,6 +42,7 @@ impl Options {
             paths: None,
             signature: None,
             references: None,
+            kernel_source: None,
             hash: None,
             after: None,
         }
