@@ -34,7 +34,9 @@ pub fn cmd_suse(options: &mut Options, log: &Log, subcommand: &mut Command, matc
         Some(("export", _sub_m)) => {
             cmd_suse_export(options, log)?;
         },
-        Some(("unblacklist", _sub_m)) => {},
+        Some(("unblacklist", _sub_m)) => {
+            cmd_suse_unblacklist(options, log)?;
+        },
         Some(("replace", _sub_m)) => {},
         Some(("apply", _sub_m)) => {},
         Some((&_, _)) => {},
@@ -125,5 +127,58 @@ pub fn cmd_suse_export(options: &Options, log: &Log) -> Result<(), Box<dyn Error
             return Err(format!("Failed to add signature to {}", file_path).as_str().into());
         }
     }
+    Ok(())
+}
+
+// Remove a blacklist entry from a specified blacklist.conf file
+fn remove_blacklist_entry(hash: &str, kernel_source: &str) -> Result<(), Box<dyn Error>> {
+    let file_path = format!("{}/blacklist.conf", kernel_source);
+    let contents: String = fs::read_to_string(&file_path)?.parse()?;
+    let mut output: Vec<&str> = vec![];
+
+    let lines: Vec<&str> = contents.split("\n").collect();
+    for line in lines {
+        let cols: Vec<&str> = line.split(" ").collect();
+
+        if cols.len() > 0 && cols[0] == hash {
+            println!("Removed blacklist entry:\n{}", line);
+            continue;
+        }
+
+        output.push(line);
+    }
+
+    let output = output.join("\n");
+    fs::write(&file_path, output)?;
+
+    Ok(())
+}
+
+pub fn cmd_suse_unblacklist(options: &Options, log: &Log) -> Result<(), Box<dyn Error>> {
+    let work_dir = options.work_dir.clone().unwrap();
+    let kernel_source = options.kernel_source.clone().unwrap();
+
+    println!("Removing blacklist entries in blacklist.conf...");
+
+    let mut paths = fs::read_dir(format!("{}/patches.suse/", work_dir))?
+                    .map(|res| res.map(|e| e.path()))
+                    .collect::<Result<Vec<_>, io::Error>>()?;
+    paths.sort();
+
+    for path in paths {
+        let file_path = path.display().to_string();
+        let contents: String = fs::read_to_string(&file_path)?.parse()?;
+
+        let git_commit: Vec<&str> = contents.split("Git-commit: ").collect();
+        let git_commit: Vec<&str> = git_commit[1].split("\n").collect();
+        let git_commit = git_commit[0];
+
+        if git_commit.len() != 40 {
+            return Err(format!("Failed to parse Git-commit tag from file: {}", file_path).into());
+        }
+
+        remove_blacklist_entry(&git_commit, &kernel_source)?;
+    }
+
     Ok(())
 }
