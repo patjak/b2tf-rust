@@ -223,4 +223,15 @@ impl Log {
 
         Ok(last_applied)
     }
+
+    pub fn get_upstream(&self, hash: &str) -> Result<String, Box<dyn Error>> {
+        let commits = self.get_all()?;
+
+        for commit in commits {
+            if commit.1 == hash {
+                return Ok(commit.0);
+            }
+        }
+        Err(format!("Failed to find upstream hash for downstream hash {}", hash).into())
+    }
 }
