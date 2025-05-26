@@ -110,22 +110,23 @@ impl Git {
 
         if !Git::branch_exists(branch, dir)? {
             println!("Branch {} doesn't exist. Creating branch {} from point {}...", branch, branch, branch_point);
-            Git::cmd(format!("checkout -b {} {}", branch, branch_point), dir)?;
+            Git::cmd_passthru(format!("checkout -b {} {}", branch, branch_point), dir)?;
             return Ok(());
         }
 
-        Git::cmd(format!("checkout {branch}"), dir)?;
+        Git::cmd_passthru(format!("checkout {branch}"), dir)?;
 
         Ok(())
     }
 
     pub fn branch_exists(branch: &String, dir: &String) -> Result<bool, Box<dyn Error>> {
-        let status = Command::new("sh")
+        let output = Command::new("sh")
+            .arg("-c")
             .arg(format!("git -C {} rev-parse --verify {}", dir, branch))
-            .status()
+            .output()
             .expect("Failed to check if branch exists");
 
-        if status.success() {
+        if output.status.success() {
             return Ok(true);
         }
 
