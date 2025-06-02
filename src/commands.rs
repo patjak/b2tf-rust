@@ -155,19 +155,15 @@ fn get_commit_cache(options: &Options) -> Result<Vec<(String, String)>, Box<dyn 
     Ok(cache)
 }
 
-fn compare_patches(options: &Options, hash1: &str, hash2: &str) -> Result<bool, Box<dyn Error>> {
-    let git_dir = options.git_dir.clone().unwrap();
-
-    let commit1 = Git::show(hash1, &git_dir)?;
-    let commit2 = Git::show(hash2, &git_dir)?;
-
+fn compare_diffs(diff1: &String, diff2: &String) -> Result<bool, Box<dyn Error>> {
     let mut patch1 = PatchSet::new();
-    patch1.parse(commit1.body).expect("Error parsing diff");
+    patch1.parse(diff1).expect("Error parsing diff");
 
     let mut patch2 = PatchSet::new();
-    patch2.parse(commit2.body).expect("Error parsing diff");
+    patch2.parse(diff2).expect("Error parsing diff");
 
-    if patch1.len() != patch2.len() {
+
+    if diff1.len() != diff2.len() {
         return Ok(false);
     }
 
@@ -198,6 +194,22 @@ fn compare_patches(options: &Options, hash1: &str, hash2: &str) -> Result<bool, 
     }
 
     Ok(true)
+}
+
+pub fn compare_patches(src_path: &str, dst_path: &str) -> Result<bool, Box<dyn Error>> {
+    let src: String = fs::read_to_string(src_path)?;
+    let dst: String = fs::read_to_string(dst_path)?;
+
+    Ok(compare_diffs(&src, &dst)?)
+}
+
+fn compare_commits(options: &Options, hash1: &str, hash2: &str) -> Result<bool, Box<dyn Error>> {
+    let git_dir = options.git_dir.clone().unwrap();
+
+    let commit1 = Git::show(hash1, &git_dir)?;
+    let commit2 = Git::show(hash2, &git_dir)?;
+
+    Ok(compare_diffs(&commit1.body, &commit2.body)?)
 }
 
 // Returns true if a patch was applied
@@ -306,9 +318,9 @@ pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>>
                 let mut is_duplicate = false;
 
                 for cache_item in commit_cache.iter() {
-                    // Do a quick compare on subject to avoid the costly compare_patches() call.
+                    // Do a quick compare on subject to avoid the costly compare_commits() call.
                     if commit.subject == cache_item.1 {
-                        let res = compare_patches(options, &commit.hash, &cache_item.0)?;
+                        let res = compare_commits(options, &commit.hash, &cache_item.0)?;
                         if res {
                             println!("{} {}", "Found duplicate:".yellow(), cache_item.0);
                             is_duplicate = true;
