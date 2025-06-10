@@ -99,7 +99,10 @@ pub fn cmd_suse_export(options: &Options, log: &Log) -> Result<(), Box<dyn Error
             .output()
             .expect(format!("Failed to update tags in {}", file_path).as_str());
 
+        let stderr = String::from_utf8(output.stderr).expect("Invalid UTF8");
+
         if !output.status.success() {
+            println!("{}", stderr);
             return Err(format!("Failed to run patch-tags-from-git on: {}", file_path).into());
         }
 
