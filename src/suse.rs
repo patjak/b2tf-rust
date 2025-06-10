@@ -241,3 +241,22 @@ fn set_suse_tag(file_path: &String, kernel_source: &String, tag: &str, value: &s
 
     Ok(())
 }
+
+fn get_ref_link(r: &str) -> String {
+    let t: Vec<&str> = r.split("#").collect();
+
+    if t.len() != 2 {
+        return "".to_string();
+    }
+
+    let mut link = String::new();
+
+    let link_type = t[0].to_lowercase();
+    if link_type == "bsc" {
+        link = format!("https://bugzilla.suse.com/show_bug.cgi?id={}\n", t[1]);
+    } else if link_type == "jsc" {
+        link = format!("https://jira.suse.com/browse/{}\n", t[1]);
+    }
+
+    link
+}
