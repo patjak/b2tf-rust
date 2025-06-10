@@ -35,7 +35,7 @@ pub fn cmd_suse(options: &mut Options, log: &Log, subcommand: &mut Command, matc
             cmd_suse_export(options, log)?;
         },
         Some(("unblacklist", _sub_m)) => {
-            cmd_suse_unblacklist(options, log)?;
+            cmd_suse_unblacklist(options)?;
         },
         Some(("replace", _sub_m)) => {},
         Some(("apply", _sub_m)) => {},
@@ -181,7 +181,7 @@ fn get_git_commit_from_patch(file_path: &String) -> Result<String, Box<dyn Error
     Ok(git_commit.to_string())
 }
 
-pub fn cmd_suse_unblacklist(options: &Options, log: &Log) -> Result<(), Box<dyn Error>> {
+pub fn cmd_suse_unblacklist(options: &Options) -> Result<(), Box<dyn Error>> {
     let work_dir = options.work_dir.clone().unwrap();
     let kernel_source = options.kernel_source.clone().unwrap();
 
