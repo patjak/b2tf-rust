@@ -321,6 +321,23 @@ fn copy_references(src_path: &String, dst_path: &String, kernel_source: &String)
     Ok(())
 }
 
+fn suse_log(kernel_source: &String) -> Result<(), Box<dyn Error>> {
+    let output = Cmd::new("sh")
+            .arg("-c")
+            .arg(format!("cd {} && scripts/log --no-edit", kernel_source))
+            .output()
+            .expect("Failed to run scripts/log");
+
+    if !output.status.success() {
+        let stderr = String::from_utf8(output.stderr).expect("Invalid UTF8");
+
+        println!("{}", stderr);
+        return Err("Failed to run scripts/log".into());
+    }
+
+    Ok(())
+}
+
 fn check_guard(file_name: &str, kernel_source: &String) -> Result<Option<String>, Box<dyn Error>> {
     let series_path = format!("{}/series.conf", kernel_source);
     let path = format!("patches.suse/{}", file_name);
