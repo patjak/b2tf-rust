@@ -260,3 +260,63 @@ fn get_ref_link(r: &str) -> String {
 
     link
 }
+
+fn copy_patch(src: &String, dst: &String, kernel_source: &String) -> Result<(), Box<dyn Error>> {
+    // Always copy the references so they are never lost
+    copy_references(dst, src, kernel_source)?;
+
+    let status = Cmd::new("sh")
+        .arg("-c")
+        .arg(format!("cp {} {}", src, dst))
+        .status()
+        .expect("Failed to copy patch");
+
+    if !status.success() {
+        return Err("Failed to copy patch".into());
+    }
+
+    Ok(())
+}
+
+// Adds the contents of the references tag from src_path to dst_path
+fn copy_references(src_path: &String, dst_path: &String, kernel_source: &String) -> Result<(), Box<dyn Error>> {
+    // If there is no source file we do nothing
+    if !fs::exists(src_path)? {
+        return Ok(());
+    }
+
+    let src_tag = get_suse_tags(src_path, kernel_source, "References")?;
+    let dst_tag = get_suse_tags(dst_path, kernel_source, "References")?;
+
+    if src_tag.is_empty() {
+        println!("{:?}", src_tag);
+        return Err(format!("Source patch didn't have a references tag: {}", src_path).into());
+    }
+    let src_refs: Vec<&str> = src_tag[0].split(" ").collect();
+
+    if dst_tag.is_empty() {
+        return Err("Destination patch didn't have a referecnes tag".into());
+    }
+    let dst_refs: Vec<&str> = dst_tag[0].split(" ").collect();
+
+    let mut result_str = String::new();
+
+    for src_ref in src_refs {
+        let mut found = false;
+        for dst_ref in &dst_refs {
+            if src_ref == *dst_ref {
+                found = true;
+                break;
+            }
+        }
+        // If reference is not already in dst we add it
+        if !found {
+            result_str.push_str(format!("{} ", src_ref).as_str());
+        }
+    }
+
+    result_str.push_str(dst_tag[0].as_str());
+    set_suse_tag(dst_path, kernel_source, "References", result_str.as_str())?;
+
+    Ok(())
+}
