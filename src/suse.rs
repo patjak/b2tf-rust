@@ -157,16 +157,25 @@ fn remove_blacklist_entry(hash: &str, kernel_source: &str) -> Result<(), Box<dyn
     Ok(())
 }
 
-fn get_git_commit_from_patch(file_path: String) -> Result<String, Box<dyn Error>> {
-    let contents: String = fs::read_to_string(&file_path)?.parse()?;
+fn get_git_commit_from_patch(file_path: &String) -> Result<String, Box<dyn Error>> {
+    let mut contents: String = fs::read_to_string(file_path)?.parse()?;
+    contents = contents.to_lowercase();
 
-    let git_commit: Vec<&str> = contents.split("Git-commit: ").collect();
+    let git_commit: Vec<&str> = contents.split("git-commit: ").collect();
+
+    // If the patch is not in an upstream repo an empty string is returned which will never match
+    // with one of our backported commits
+    if git_commit.len() <= 1 {
+        return Ok("".to_string());
+    }
+
     let git_commit: Vec<&str> = git_commit[1].split("\n").collect();
-    let git_commit = git_commit[0];
+    let git_commit: Vec<&str> = git_commit[0].trim().split(" ").collect();
+    let git_commit = git_commit[0].trim();
 
     if git_commit.len() != 40 {
-        return Err(format!("Failed to parse Git-commit tag from file: {}",
-                           file_path).into());
+        return Err(format!("Failed to parse Git-commit tag from file: {} {}",
+                           file_path, git_commit).into());
     }
 
     Ok(git_commit.to_string())
@@ -185,7 +194,7 @@ pub fn cmd_suse_unblacklist(options: &Options, log: &Log) -> Result<(), Box<dyn 
 
     for path in paths {
         let file_path = path.display().to_string();
-        let git_commit = get_git_commit_from_patch(file_path)?;
+        let git_commit = get_git_commit_from_patch(&file_path)?;
         remove_blacklist_entry(&git_commit, &kernel_source)?;
     }
 
