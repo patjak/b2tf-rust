@@ -320,3 +320,91 @@ fn copy_references(src_path: &String, dst_path: &String, kernel_source: &String)
 
     Ok(())
 }
+
+fn check_guard(file_name: &str, kernel_source: &String) -> Result<Option<String>, Box<dyn Error>> {
+    let series_path = format!("{}/series.conf", kernel_source);
+    let path = format!("patches.suse/{}", file_name);
+    let file = fs::read_to_string(series_path)?;
+    let lines: Vec<&str> = file.split("\n").collect();
+
+    for line in lines {
+        let l = line.trim();
+        let cols: Vec<&str> = l.split("\t").collect();
+
+        // Check if patch is guarded
+        if cols.len() >= 2 && cols[1] == path && cols[0].chars().nth(0).unwrap() == '+' {
+            return Ok(Some(cols[0].to_string()));
+        }
+    }
+
+    Ok(None)
+}
+
+// Mark a patch with +b2tf in series.conf
+fn insert_guard(file_name: &str, kernel_source: &String) -> Result<(), Box<dyn Error>> {
+    let series_path = format!("{}/series.conf", kernel_source);
+    let path = format!("patches.suse/{}", file_name);
+    let file = fs::read_to_string(&series_path)?;
+    let lines: Vec<&str> = file.split("\n").collect();
+
+    if check_guard(file_name, kernel_source)?.is_some() {
+        return Err("Patch is already guarded".into());
+    }
+
+    let mut result_str = String::new();
+    let mut guard_str = String::new();
+
+    for line in lines {
+        let l = line.trim();
+        let cols: Vec<&str> = l.split("\t").collect();
+
+        if cols.len() == 1 && cols[0] == path {
+            println!("Adding guard +b2tf to {}", path);
+            guard_str.push_str(format!("+b2tf\t{}\n", path).as_str());
+            continue;
+        }
+        result_str.push_str(format!("{}\n", line).as_str());
+    }
+
+    // Remove last newline if needed
+    let last_char = result_str.pop().unwrap();
+    if last_char != '\n' {
+        result_str.push(last_char);
+    }
+
+    // Append the guarded patch to the end of series.conf
+    result_str.push_str(&guard_str);
+
+    fs::write(&series_path, result_str)?;
+
+    Ok(())
+}
+
+// Remove a patch marked with +b2tf in series.conf
+fn remove_guard(file_name: &str, kernel_source: &String) -> Result<(), Box<dyn Error>> {
+    let series_path = format!("{}/series.conf", kernel_source);
+    let path = format!("patches.suse/{}", file_name);
+    let file = fs::read_to_string(&series_path)?;
+    let lines: Vec<&str> = file.split("\n").collect();
+
+    if !check_guard(file_name, kernel_source)?.is_some() {
+        return Err("Patch is not guarded".into());
+    }
+
+    let mut result_str = String::new();
+
+    for line in lines {
+        let l = line.trim();
+        let cols: Vec<&str> = l.split("\t").collect();
+
+        if cols.len() == 1 && cols[0] == path {
+            println!("Removing guard +b2tf to {}", path);
+            continue;
+        }
+        result_str.push_str(format!("{}\n", line).as_str());
+    }
+
+    fs::write(&series_path, result_str)?;
+
+    Ok(())
+}
