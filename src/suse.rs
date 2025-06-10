@@ -200,3 +200,44 @@ pub fn cmd_suse_unblacklist(options: &Options) -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
+
+fn get_suse_tags(file_path: &String, kernel_source: &String, tag: &str) -> Result <Vec<String>, Box<dyn Error>> {
+    let output = Cmd::new("sh")
+        .arg("-c")
+        .arg(format!("{}/scripts/patch-tag --print {} {}", kernel_source, tag, file_path))
+        .output()
+        .expect("Failed to get tag");
+
+    let stdout = String::from_utf8(output.stdout).expect("Invalid UTF8");
+    let lines: Vec<&str> = stdout.split("\n").collect();
+    let mut tags = Vec::new();
+    let tag_str = format!("{}: ", tag);
+
+    for line in lines {
+        let cols: Vec<&str> = line.split(&tag_str).collect();
+        if cols.len() != 2 {
+            continue;
+        }
+        tags.push(cols[1].to_string());
+    }
+
+    Ok(tags)
+}
+
+fn set_suse_tag(file_path: &String, kernel_source: &String, tag: &str, value: &str) -> Result <(), Box<dyn Error>> {
+    let query = format!("{}/scripts/patch-tag --tag {}='{}' {}", kernel_source, tag, value, file_path);
+    let output = Cmd::new("sh")
+        .arg("-c")
+        .arg(query)
+        .output()
+        .expect("Failed to get tag");
+
+    let stderr = String::from_utf8(output.stderr).expect("Invalid UTF8");
+
+    if !output.status.success() {
+        println!("{}", stderr);
+        return Err("Failed to set SUSE tag".into());
+    }
+
+    Ok(())
+}
