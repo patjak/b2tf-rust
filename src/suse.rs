@@ -157,28 +157,46 @@ fn remove_blacklist_entry(hash: &str, kernel_source: &str) -> Result<(), Box<dyn
     Ok(())
 }
 
-fn get_git_commit_from_patch(file_path: &String) -> Result<String, Box<dyn Error>> {
+// Returns all git-commit and alt-commit tags from patch
+fn get_git_commits_from_patch(file_path: &String) -> Result<Vec<String>, Box<dyn Error>> {
+    if !fs::exists(file_path)? {
+        return Err(format!("File not found: {}", file_path).into());
+
+    }
+
+    let mut hashes: Vec<String> = Vec::new();
+
     let mut contents: String = fs::read_to_string(file_path)?.parse()?;
     contents = contents.to_lowercase();
 
-    let git_commit: Vec<&str> = contents.split("git-commit: ").collect();
+    let lines: Vec<&str> = contents.split("\n").collect();
+    for line in lines {
+        // Stop parsing when the diff starts
+        if line == "---" {
+            break;
+        }
+        let hash: Vec<&str> = line.split("git-commit: ").collect();
+        if hash.len() == 2 && hash[1].len() == 40 {
+            hashes.push(hash[1].to_string());
+        }
 
-    // If the patch is not in an upstream repo an empty string is returned which will never match
-    // with one of our backported commits
-    if git_commit.len() <= 1 {
-        return Ok("".to_string());
+        let hash: Vec<&str> = line.split("alt-commit: ").collect();
+        if hash.len() == 2 &&  hash[1].len() == 40 {
+            hashes.push(hash[1].to_string());
+        }
     }
 
-    let git_commit: Vec<&str> = git_commit[1].split("\n").collect();
-    let git_commit: Vec<&str> = git_commit[0].trim().split(" ").collect();
-    let git_commit = git_commit[0].trim();
+    Ok(hashes)
+}
 
-    if git_commit.len() != 40 {
-        return Err(format!("Failed to parse Git-commit tag from file: {} {}",
-                           file_path, git_commit).into());
+fn compare_commits(list1: &Vec<String>, list2: &Vec<String>) -> bool {
+    for h in list1 {
+        if list2.contains(h) {
+            return true;
+        }
     }
 
-    Ok(git_commit.to_string())
+    false
 }
 
 pub fn cmd_suse_unblacklist(options: &Options) -> Result<(), Box<dyn Error>> {
@@ -194,8 +212,10 @@ pub fn cmd_suse_unblacklist(options: &Options) -> Result<(), Box<dyn Error>> {
 
     for path in paths {
         let file_path = path.display().to_string();
-        let git_commit = get_git_commit_from_patch(&file_path)?;
-        remove_blacklist_entry(&git_commit, &kernel_source)?;
+        let git_commits = get_git_commits_from_patch(&file_path)?;
+        for hash in git_commits {
+            remove_blacklist_entry(&hash, &kernel_source)?;
+        }
     }
 
     Ok(())
