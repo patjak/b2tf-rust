@@ -540,9 +540,11 @@ pub fn cmd_status(options: &Options, log: &Log) -> Result<(), Box<dyn Error>> {
 
     print_session(&git_dir, log)?;
 
-    let next_commit = log.next_commit();
-    let commit = Git::show(next_commit, &git_dir)?;
-    println!("\nNext commit to apply:\n{} {}", commit.hash, commit.subject);
+    if next_index < num_commits {
+        let next_commit = log.next_commit();
+        let commit = Git::show(next_commit, &git_dir)?;
+        println!("\nNext commit to apply:\n{} {}", commit.hash, commit.subject);
+    }
 
     Ok(())
 }
