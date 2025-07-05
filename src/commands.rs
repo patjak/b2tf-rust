@@ -184,7 +184,6 @@ fn compare_diffs(diff1: &String, diff2: &String) -> Result<CompareResult, Box<dy
     patch2.parse(diff2).expect("Error parsing diff");
 
     if patch1.len() != patch2.len() {
-        println!("File count mismatch: {} {}", patch1.len(), patch2.len());
         return Ok(CompareResult::Different);
     }
 
@@ -206,13 +205,11 @@ fn compare_diffs(diff1: &String, diff2: &String) -> Result<CompareResult, Box<dy
         let hunks2 = file2.hunks();
 
         if hunks1.len() != hunks2.len() {
-            println!("Hunks length mismatch");
             return Ok(CompareResult::Different);
         }
 
         for j in 0..(hunks1.len() - 1) {
             if hunks1[j].section_header != hunks2[j].section_header {
-                println!("header1: {}\nheader2: {}", hunks1[j].section_header, hunks2[j].section_header);
                 return Ok(CompareResult::Different);
             }
 
@@ -220,7 +217,6 @@ fn compare_diffs(diff1: &String, diff2: &String) -> Result<CompareResult, Box<dy
             let lines2 = hunks2[j].lines();
 
             if lines1.len() != lines2.len() {
-                println!("Lines length mismatch");
                 return Ok(CompareResult::Different);
             }
 
@@ -236,9 +232,6 @@ fn compare_diffs(diff1: &String, diff2: &String) -> Result<CompareResult, Box<dy
 
                 if line1.line_type != line2.line_type ||
                    line1.value != line2.value {
-                       println!("Lines not matching");
-                       println!("{} {}", lines1[k].line_type, lines1[k].value);
-                       println!("{} {}", lines2[k].line_type, lines2[k].value);
                        return Ok(CompareResult::Different);
                  }
             }
