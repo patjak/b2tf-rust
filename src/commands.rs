@@ -264,7 +264,7 @@ fn compare_commits(options: &Options, hash1: &str, hash2: &str) -> Result<Compar
 // Returns true if a patch was applied
 fn handle_git_state(options: &Options, log: &mut Log) -> Result<bool, Box<dyn Error>> {
     let git_dir = options.git_dir.clone().unwrap();
-    let session = Git::get_session(&git_dir, log)?;
+    let session = Git::get_session(&git_dir)?;
 
     if session.state == GitSessionState::Cherrypick {
         let log_read = log.clone();
@@ -387,7 +387,7 @@ pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>>
                     i -= 1;
                 }
 
-                let session = Git::get_session(&git_dir, log)?;
+                let session = Git::get_session(&git_dir)?;
 
                 // If the user didn't fix the conflict we abort
                 if !session.unmerged_paths.is_empty() {
@@ -398,8 +398,8 @@ pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>>
     }
 }
 
-fn print_session(git_dir: &String, log: &Log) -> Result<(), Box<dyn Error>> {
-    let session = Git::get_session(git_dir, log)?;
+fn print_session(git_dir: &String) -> Result<(), Box<dyn Error>> {
+    let session = Git::get_session(git_dir)?;
 
     if !session.modified_paths.is_empty() {
         println!("\nChanges to be committed:");
@@ -447,10 +447,10 @@ fn find_conflict_lineno(file: String) -> Result<String, Box<dyn Error>> {
 pub fn cmd_edit(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
     let git_dir = options.git_dir.clone().unwrap();
     let range_stop = options.range_stop.clone().unwrap();
-    let session = Git::get_session(&git_dir, log)?;
+    let session = Git::get_session(&git_dir)?;
     let commit = log.next_commit();
 
-    print_session(&git_dir, log)?;
+    print_session(&git_dir)?;
 
     for path in session.unmerged_paths.iter() {
         let file = &path.1;
@@ -503,7 +503,7 @@ pub fn cmd_edit(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> 
                 println!("{}", "File still contains conflics!".red());
             }
         }
-        let session = Git::get_session(&git_dir, log)?;
+        let session = Git::get_session(&git_dir)?;
 
         if session.unmerged_paths.is_empty() && !session.modified_paths.is_empty() {
             println!("All conflicts resolved.");
@@ -530,7 +530,7 @@ pub fn cmd_status(options: &Options, log: &Log) -> Result<(), Box<dyn Error>> {
 
     println!("{summary}\n");
 
-    let session = Git::get_session(&git_dir, log)?;
+    let session = Git::get_session(&git_dir)?;
 
     match session.state {
         GitSessionState::Cherrypick => println!("{}", "Session: Cherry-picking".yellow()),
@@ -538,7 +538,7 @@ pub fn cmd_status(options: &Options, log: &Log) -> Result<(), Box<dyn Error>> {
         GitSessionState::None => println!("No session"),
     }
 
-    print_session(&git_dir, log)?;
+    print_session(&git_dir)?;
 
     if next_index < num_commits {
         let next_commit = log.next_commit();
@@ -586,7 +586,7 @@ pub fn cmd_skip(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> 
     let git_dir = options.git_dir.clone().unwrap();
     let log_read = log.clone();
 
-    let session = Git::get_session(&git_dir, log)?;
+    let session = Git::get_session(&git_dir)?;
 
     if session.state == GitSessionState::Cherrypick {
         Git::cmd("cherry-pick --abort".to_string(), &git_dir)?;
@@ -725,7 +725,7 @@ pub fn cmd_rebase(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>
     let pathbuf = temp_file.to_path_buf();
     let filename = pathbuf.as_os_str().to_str().unwrap();
     let mut file = fs::File::create(&temp_file)?;
-    let session = Git::get_session(&git_dir, log)?;
+    let session = Git::get_session(&git_dir)?;
 
     if session.state == GitSessionState::None {
         for hash in commits {
@@ -760,7 +760,7 @@ pub fn cmd_rebase(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>
     }
 
     loop {
-        let session = Git::get_session(&git_dir, log)?;
+        let session = Git::get_session(&git_dir)?;
         if session.state == GitSessionState::None {
             break;
         }
