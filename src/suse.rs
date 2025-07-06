@@ -378,14 +378,23 @@ fn check_guard(file_name: &str, kernel_source: &String) -> Result<Option<String>
 }
 
 // Mark a patch with +b2tf in series.conf
-fn insert_guard(file_name: &str, kernel_source: &String) -> Result<(), Box<dyn Error>> {
+fn insert_guard(file_name: &str, kernel_source: &String, processed_commits: &mut Vec<Vec<String>>) -> Result<(), Box<dyn Error>> {
     let series_path = format!("{}/series.conf", kernel_source);
     let path = format!("patches.suse/{}", file_name);
     let file = fs::read_to_string(&series_path)?;
     let lines: Vec<&str> = file.split("\n").collect();
 
+    // Check series.conf if patch is already guarded
     if check_guard(file_name, kernel_source)?.is_some() {
         return Err("Patch is already guarded".into());
+    }
+
+    // Make sure we're not guarding an already processed commit
+    let hashes = get_git_commits_from_patch(&format!("{}/{}", kernel_source, path))?;
+    for g in &mut *processed_commits {
+        if compare_commits(&hashes, &g) {
+            return Err("Trying to guard a processed commit".into());
+        }
     }
 
     let mut result_str = String::new();
