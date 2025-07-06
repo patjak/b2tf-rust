@@ -443,8 +443,7 @@ fn remove_guard(file_name: &str, kernel_source: &String) -> Result<(), Box<dyn E
         let l = line.trim();
         let cols: Vec<&str> = l.split("\t").collect();
 
-        if cols.len() == 1 && cols[0] == path {
-            println!("Removing guard +b2tf to {}", path);
+        if cols.len() == 2 && cols[0] == "+b2tf" && cols[1] == path {
             continue;
         }
         result_str.push_str(format!("{}\n", line).as_str());
