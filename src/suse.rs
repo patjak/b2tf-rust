@@ -250,7 +250,7 @@ fn set_suse_tag(file_path: &String, kernel_source: &String, tag: &str, value: &s
         .arg("-c")
         .arg(query)
         .output()
-        .expect("Failed to get tag");
+        .expect("Failed to set tag");
 
     let stderr = String::from_utf8(output.stderr).expect("Invalid UTF8");
 
