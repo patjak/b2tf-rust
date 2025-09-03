@@ -262,6 +262,24 @@ fn set_suse_tag(file_path: &String, kernel_source: &String, tag: &str, value: &s
     Ok(())
 }
 
+fn add_suse_tag(file_path: &String, kernel_source: &String, tag: &str, value: &str) -> Result <(), Box<dyn Error>> {
+    let query = format!("{}/scripts/patch-tag --add {}='{}' {}", kernel_source, tag, value, file_path);
+    let output = Cmd::new("sh")
+        .arg("-c")
+        .arg(query)
+        .output()
+        .expect("Failed to add tag");
+
+    let stderr = String::from_utf8(output.stderr).expect("Invalid UTF8");
+
+    if !output.status.success() {
+        println!("{}", stderr);
+        return Err("Failed to add SUSE tag".into());
+    }
+
+    Ok(())
+}
+
 fn get_ref_link(r: &str) -> String {
     let t: Vec<&str> = r.split("#").collect();
 
