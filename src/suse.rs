@@ -396,6 +396,76 @@ fn series_sort(kernel_source: &String) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn sequence_patch(kernel_source: &String, file_name: &String, paths: &Vec<PathBuf>, processed_commits: &mut Vec<Vec<String>>) -> Result<(), Box<dyn Error>> {
+    'outer: loop {
+        let output = Cmd::new("sh")
+            .arg("-c")
+            .arg(format!("cd {} && scripts/sequence-patch.sh --dry --rapid", kernel_source))
+            .output()
+            .expect("Failed to sequence patches");
+
+        let stderr = String::from_utf8(output.stderr).expect("Invalid UTF8");
+
+        if output.status.success() {
+            break;
+        }
+
+        let lines: Vec<&str> = stderr.split("\n").collect();
+        let cols: Vec<&str> = lines[0].split(" ").collect();
+        let failed_patch = cols[1];
+
+        println!("{} {}", "Sequence failed with patch:".red(), failed_patch.red());
+
+        // If sequencing fails we check if the failed patch is going to be applied
+        // by us later. And if so, we automatically guard it.
+        let failed_hashes = get_git_commits_from_patch(&format!("{}/{}", &kernel_source, &failed_patch))?;
+        'inner: for path in paths {
+            let hashes = get_git_commits_from_patch(&path.display().to_string())?;
+
+            if compare_commits(&hashes, &failed_hashes) {
+                 for p in &mut *processed_commits {
+                    if compare_commits(&hashes, &p) {
+                        // We've already processed this patch so don't try to guard it
+                        // automatically
+                        break 'inner;
+                    }
+                }
+                println!("{}", "Automatically guarding patch since it will be applied later".yellow());
+                let file_name = failed_patch.split("/").collect::<Vec<&str>>().clone();
+                let file_name = file_name.last().unwrap();
+                insert_guard(file_name, kernel_source, processed_commits)?;
+                continue 'outer;
+            }
+        }
+
+        let ask = Util::ask("(R)etry, (g)uard, (v)iew, (a)bort: ".to_string(), vec!["r", "g", "v", "a"], "r");
+
+        match ask.as_str() {
+            "r" => (),
+            "g" => {
+                let file_name = failed_patch.split("/").collect::<Vec<&str>>().clone();
+                let file_name = file_name.last().unwrap();
+                insert_guard(file_name, kernel_source, processed_commits)?;
+            },
+            "v" => {
+                Cmd::new("sh")
+                    .arg("-c")
+                    .arg(format!("vim {}/{}", kernel_source, failed_patch))
+                    .status()
+                    .expect("Failed to open failed patch file");
+                continue;
+            },
+            "a" => {
+                series_remove(kernel_source, file_name)?;
+                return Err("Aborted by user".into());
+            },
+            _ => (),
+        }
+    }
+
+    Ok(())
+}
+
 fn series_insert(kernel_source: &String, file_name: &String) -> Result<(), Box<dyn Error>> {
     let path = format!("patches.suse/{}", file_name);
     let query = format!("cd {} && scripts/git_sort/series_insert {} && git add {}",
