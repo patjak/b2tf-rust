@@ -2,10 +2,14 @@ use std::process::Command as Cmd;
 use std::error::Error;
 use std::{fs, io};
 use std::path;
+use std::path::*;
 use crate::Options;
 use crate::Log;
 use crate::git::Git;
+use crate::Util;
+use crate::commands::*;
 use clap::{ArgMatches, Command};
+use colored::Colorize;
 
 pub fn cmd_suse(options: &mut Options, log: &Log, subcommand: &mut Command, matches: &ArgMatches) -> Result<(), Box<dyn Error>> {
     let signature = matches.get_one::<String>("signature").cloned();
