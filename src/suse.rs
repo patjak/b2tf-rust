@@ -574,7 +574,8 @@ fn insert_guard(file_name: &str, kernel_source: &String, processed_commits: &mut
     let hashes = get_git_commits_from_patch(&format!("{}/{}", kernel_source, path))?;
     for g in &mut *processed_commits {
         if compare_commits(&hashes, &g) {
-            return Err("Trying to guard a processed commit".into());
+            println!("{}", "Patch has already been processed and cannot be guarded. Patch must be fixed instead.".red());
+            return Ok(());
         }
     }
 
@@ -586,7 +587,7 @@ fn insert_guard(file_name: &str, kernel_source: &String, processed_commits: &mut
         let cols: Vec<&str> = l.split("\t").collect();
 
         if cols.len() == 1 && cols[0] == path {
-            println!("Adding guard +b2tf to {}", path);
+            println!("{} {}", "Adding guard +b2tf to".yellow(), path.yellow());
             guard_str.push_str(format!("+b2tf\t{}\n", path).as_str());
             continue;
         }
