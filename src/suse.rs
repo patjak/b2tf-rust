@@ -41,7 +41,9 @@ pub fn cmd_suse(options: &mut Options, log: &Log, subcommand: &mut Command, matc
         Some(("unblacklist", _sub_m)) => {
             cmd_suse_unblacklist(options)?;
         },
-        Some(("apply", _sub_m)) => {},
+        Some(("apply", _sub_m)) => {
+            cmd_suse_apply(options)?;
+        },
         Some((&_, _)) => {},
         None => {let _ = subcommand.print_help();},
     }
@@ -714,4 +716,114 @@ fn replace_patch(file_path: &String, suse_path: &String, kernel_source: &String,
     }
 
     Ok(handled)
+}
+
+pub fn cmd_suse_apply(options: &Options) -> Result<(), Box<dyn Error>> {
+    let work_dir = options.work_dir.clone().unwrap();
+    let kernel_source = options.kernel_source.clone().unwrap();
+
+    println!("Applying patches to SUSE kernel-source...\n");
+
+    // Gather all commits from kernel_source as (file_path, git-commit)
+    let mut suse_paths: Vec<(String, Vec<String>)> = vec![];
+    let paths = fs::read_dir(format!("{}/patches.suse/", kernel_source))?;
+    for path in paths {
+        let file_path = path?.path().display().to_string().clone();
+        let git_commits = get_git_commits_from_patch(&file_path)?.clone();
+        suse_paths.push((file_path, git_commits));
+    }
+
+    let mut paths = fs::read_dir(format!("{}/patches.suse/", work_dir))?
+                    .map(|res| res.map(|e| e.path()))
+                    .collect::<Result<Vec<_>, io::Error>>()?;
+    paths.sort();
+
+    let mut i = 1;
+    let total = paths.len();
+
+    // Store the choices made by the user
+    let mut always_replace: Vec<String> = vec![];
+    let mut never_replace: Vec<String> = vec![];
+
+    // Remeber what we've processed so we don't end up in a guard/unguard loop
+    let mut processed_commits: Vec<Vec<String>> = vec![];
+
+    // Loop over all backported patches
+    for path in &paths {
+        let file_path = path.display().to_string();
+        let file_name = file_path.split("/").collect::<Vec<&str>>().clone();
+        let file_name = file_name.last().unwrap();
+        let git_commits = get_git_commits_from_patch(&file_path)?;
+        processed_commits.push(git_commits.clone());
+
+        println!("Progress:\t{}/{}\t{}", i, total, file_name);
+        i += 1;
+
+        let mut handled = false;
+        let mut unguarding = false;
+        // Loop over all already existing SUSE backports
+        for suse_path in &suse_paths {
+            if !compare_commits(&git_commits, &suse_path.1) {
+                continue;
+            }
+
+            // If the patch is guarded by us we must unguard it first
+            let guard_file_name = suse_path.0.split("/").collect::<Vec<&str>>().clone();
+            let guard_file_name = guard_file_name.last().unwrap();
+            let guard = check_guard(guard_file_name, &kernel_source)?;
+            if guard.is_some() && guard.unwrap() == "+b2tf" {
+                println!("{} {}", "Unguarding".yellow(), guard_file_name.yellow());
+                remove_guard(&guard_file_name, &kernel_source)?;
+                series_insert(&kernel_source, &guard_file_name.to_string())?;
+                unguarding = true;
+            }
+
+            let comp_res = compare_patches(&file_path, &suse_path.0)?;
+
+            if comp_res == CompareResult::Identical || comp_res == CompareResult::Same {
+                let query = format!("ls-files --error-unmatch {} > /dev/null", suse_path.0);
+                if !Git::cmd_passthru(query, &kernel_source)? {
+                    return Err("Patch was applied but not committed. Fix the state of the kernel-source before continuing".into());
+                }
+
+                if unguarding {
+                    println!("Patch is same or identical. Sequencing...");
+                    sequence_patch(&kernel_source, &file_name.to_string(), &paths, &mut processed_commits)?;
+                    suse_log(&kernel_source, &suse_path.0)?;
+                    handled = true;
+                } else {
+                    println!("Patch is same or identical. Skipping.");
+                    handled = true;
+                }
+                break;
+            }
+
+            handled = replace_patch(&file_path, &suse_path.0, &kernel_source, &mut always_replace, &mut never_replace)?;
+            if !handled {
+                copy_patch(&file_path, &suse_path.0, &kernel_source)?;
+
+                // Git-commit and Alt-commit might have changed places so update series.conf
+                series_sort(&kernel_source)?;
+
+                sequence_patch(&kernel_source, &file_name.to_string(), &paths, &mut processed_commits)?;
+                suse_log(&kernel_source, &suse_path.0)?;
+                handled = true;
+            }
+        }
+
+        if handled {
+            continue;
+        }
+
+        let dst_path = format!("{}/patches.suse/{}", kernel_source, file_name);
+
+        copy_patch(&file_path, &dst_path, &kernel_source)?;
+        series_insert(&kernel_source, &file_name.to_string())?;
+        sequence_patch(&kernel_source, &file_name.to_string(), &paths, &mut processed_commits)?;
+        suse_log(&kernel_source, "")?;
+    }
+
+    println!("\nDone");
+
+    Ok(())
 }
