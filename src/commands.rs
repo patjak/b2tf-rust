@@ -228,12 +228,12 @@ fn compare_diffs(diff1: &String, diff2: &String) -> Result<CompareResult, Box<dy
                    line1.target_line_no != line2.target_line_no ||
                    line1.diff_line_no != line2.diff_line_no {
                        context_mismatch = true;
-                 }
+                }
 
                 if line1.line_type != line2.line_type ||
                    line1.value != line2.value {
                        return Ok(CompareResult::Different);
-                 }
+                }
             }
         }
     }
