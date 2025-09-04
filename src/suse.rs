@@ -299,9 +299,32 @@ fn get_ref_link(r: &str) -> String {
     link
 }
 
+fn copy_alt_commits(src: &String, dst: &String, kernel_source: &String) -> Result<(), Box<dyn Error>> {
+    // If there is no source file we do nothing
+    if !fs::exists(src)? {
+        return Ok(());
+    }
+
+    let dst_commits = get_git_commits_from_patch(dst)?;
+    let src_commits = get_git_commits_from_patch(src)?;
+
+    // Transfer all non git-commit hashes from src to dst as alt-commits
+    for d in src_commits {
+        if !dst_commits.contains(&d) {
+            println!("{} {}", "Adding Alt-commit: ".yellow(), &d.yellow());
+            add_suse_tag(dst, kernel_source, "Alt-commit", &d)?;
+        }
+    }
+
+    Ok(())
+}
+
 fn copy_patch(src: &String, dst: &String, kernel_source: &String) -> Result<(), Box<dyn Error>> {
     // Always copy the references so they are never lost
     copy_references(dst, src, kernel_source)?;
+
+    // Copy any altenative hashes for this patch
+    copy_alt_commits(dst, src, kernel_source)?;
 
     let status = Cmd::new("sh")
         .arg("-c")
