@@ -382,6 +382,20 @@ fn copy_references(src_path: &String, dst_path: &String, kernel_source: &String)
     Ok(())
 }
 
+fn series_sort(kernel_source: &String) -> Result<(), Box<dyn Error>> {
+    let status = Cmd::new("sh")
+        .arg("-c")
+        .arg(format!("cd {} && scripts/git_sort/series_sort", kernel_source))
+        .status()
+        .expect("Failed to sort series.conf");
+
+    if !status.success() {
+        return Err("Failed to sort series.conf".into());
+    }
+
+    Ok(())
+}
+
 fn suse_log(kernel_source: &String, msg: &str) -> Result<(), Box<dyn Error>> {
     // If only series.conf is modified we are unguarding and scripts/log doesn't work
     let session = Git::get_session(&kernel_source)?;
