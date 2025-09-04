@@ -629,3 +629,86 @@ fn remove_guard(file_name: &str, kernel_source: &String) -> Result<(), Box<dyn E
 
     Ok(())
 }
+
+fn replace_patch(file_path: &String, suse_path: &String, kernel_source: &String,
+                 always_replace: &mut Vec<String>, never_replace: &mut Vec<String>) -> Result<bool, Box<dyn Error>> {
+
+    let file_name = suse_path.split("/").collect::<Vec<&str>>().clone();
+    let file_name = file_name.last().unwrap();
+
+    print!("{} {}", "Found existing patch:".yellow(), &file_name.yellow());
+
+    let refs = get_suse_tags(&suse_path, &kernel_source, "References")?;
+    if refs.len() < 1 {
+        return Err("Missing references tag".into());
+    }
+    let refs: Vec<&str> = refs[0].split(" ").collect();
+    println!(" ({})", &refs.join(" "));
+
+    // If any of the refs are not to be replaced we do nothing
+    for r in &refs {
+        if never_replace.contains(&r.to_string()) {
+            println!("Skipping patch due to reference: {}", r);
+            return Ok(true);
+        }
+    }
+
+    match compare_patches(suse_path, file_path)? {
+        CompareResult::Different => println!("Patches are different"),
+        CompareResult::Similar => println!("Patches have the same changes but at different lines"),
+        CompareResult::Same => println!("Patches have identical changes but have other differences"),
+        CompareResult::Identical => println!("Patches are identical"),
+    }
+
+    let mut handled = false;
+    for r in &refs {
+        if always_replace.contains(&r.to_string()) {
+            continue;
+        }
+
+        println!("{} {}", "Replace patch with reference:".green(), r.green().bold());
+        print!("{}", get_ref_link(&r).yellow());
+
+        loop {
+            let ask = Util::ask("(Y)es, (n)o, (a)lways, n(e)ver, (v)iew, or (s)top: ".to_string(),
+                                vec!["y", "n", "a", "e", "v", "s"], "y");
+
+            // FIXME: Support other editors
+            match ask.as_str() {
+                "y" => {
+                    // If all refs are yes we replace the patch
+                    break;
+                },
+                "n" => {
+                    // If a single ref is no we don't replace the patch
+                    handled = true;
+                    break;
+                },
+                "a" => {
+                    always_replace.push(r.to_string());
+                    break;
+                },
+                "e" => {
+                    never_replace.push(r.to_string());
+                    handled = true;
+                    break;
+                },
+                "v" => {
+                    Cmd::new("sh")
+                        .arg("-c")
+                        .arg(format!("diff -Naur {} {} > /tmp/{}.patch || vim -O {} {} /tmp/{}.patch && rm /tmp/{}.patch",
+                             suse_path, file_path, file_name, suse_path, file_path, file_name, file_name))
+                        .status()
+                        .expect("Failed to show diff");
+                },
+                "s" => {
+                    return Err("Stopped by user".into());
+                },
+                _ => (),
+            };
+        }
+
+    }
+
+    Ok(handled)
+}
