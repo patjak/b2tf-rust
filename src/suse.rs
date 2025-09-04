@@ -416,6 +416,26 @@ fn series_insert(kernel_source: &String, file_name: &String) -> Result<(), Box<d
     Ok(())
 }
 
+fn series_remove(kernel_source: &String, file_name: &String) -> Result<(), Box<dyn Error>> {
+    let path = format!("patches.suse/{}", file_name);
+    let query = format!("cd {} && git restore --staged {} && git restore series.conf && rm {}",
+                        kernel_source, path, path);
+    let output = Cmd::new("sh")
+        .arg("-c")
+        .arg(query)
+        .output()
+        .expect("series remove failed");
+
+    let stderr = String::from_utf8(output.stderr).expect("Invalid UTF8");
+
+    if !output.status.success() {
+        println!("{}", stderr);
+        return Err("series remove failed".into());
+    }
+
+    Ok(())
+}
+
 fn suse_log(kernel_source: &String, msg: &str) -> Result<(), Box<dyn Error>> {
     // If only series.conf is modified we are unguarding and scripts/log doesn't work
     let session = Git::get_session(&kernel_source)?;
