@@ -382,7 +382,18 @@ fn copy_references(src_path: &String, dst_path: &String, kernel_source: &String)
     Ok(())
 }
 
-fn suse_log(kernel_source: &String) -> Result<(), Box<dyn Error>> {
+fn suse_log(kernel_source: &String, msg: &str) -> Result<(), Box<dyn Error>> {
+    // If only series.conf is modified we are unguarding and scripts/log doesn't work
+    let session = Git::get_session(&kernel_source)?;
+    if session.unmerged_paths.len() == 0 &&
+       session.unstaged_paths.len() == 0 &&
+       session.modified_paths.len() == 1 &&
+       session.modified_paths[0].1 == "series.conf" {
+        Git::cmd("add series.conf".to_string(), &kernel_source)?;
+        Git::cmd(format!("commit -m 'Remove guard from {}'", msg), &kernel_source)?;
+        println!("Commited unguarding");
+    }
+
     let output = Cmd::new("sh")
             .arg("-c")
             .arg(format!("cd {} && scripts/log --no-edit", kernel_source))
