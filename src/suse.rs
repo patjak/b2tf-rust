@@ -41,7 +41,6 @@ pub fn cmd_suse(options: &mut Options, log: &Log, subcommand: &mut Command, matc
         Some(("unblacklist", _sub_m)) => {
             cmd_suse_unblacklist(options)?;
         },
-        Some(("replace", _sub_m)) => {},
         Some(("apply", _sub_m)) => {},
         Some((&_, _)) => {},
         None => {let _ = subcommand.print_help();},

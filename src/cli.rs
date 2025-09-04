@@ -123,10 +123,6 @@ impl Cli {
                             .about("remove blacklists for patches we are backporting")
                     )
                     .subcommand(
-                        Command::new("replace")
-                            .about("choose existing patches to keep/remove/update/replace")
-                    )
-                    .subcommand(
                         Command::new("apply")
                             .about("apply all patches to the SUSE tree")
                     )
