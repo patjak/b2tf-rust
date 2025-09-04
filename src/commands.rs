@@ -553,7 +553,7 @@ pub fn cmd_restart(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error
     let git_dir = options.git_dir.clone().unwrap();
     let branch_point = options.branch_point.clone().unwrap();
 
-    let val = Util::ask("This operation will delete all current progress and restart applying commits from the beginning. Are you sure? (y)es/(N)o: ".to_string(), vec!["y", "n"], "n");
+    let val = Util::ask("This operation will delete all current progress and restart applying commits from the beginning of the log.\nAre you sure? (y)es/(N)o: ".to_string(), vec!["y", "n"], "n");
 
     if val != "y" {
         return Ok(());
