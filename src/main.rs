@@ -137,7 +137,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         options.work_dir = Some("./".to_string());
     }
     if options.paths.is_none() {
-        options.paths = Some("/".to_string());
+        options.paths = Some("./".to_string());
     }
     if options.branch_point.is_none() {
         options.branch_point = options.range_start.clone();
