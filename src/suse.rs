@@ -387,7 +387,7 @@ fn sequence_patch(kernel_source: &String, file_name: &String, paths: &Vec<PathBu
     'outer: loop {
         let output = Cmd::new("sh")
             .arg("-c")
-            .arg(format!("cd {} && scripts/sequence-patch --dry --rapid", kernel_source))
+            .arg(format!("cd {} && scripts/sequence-patch.sh --dry --rapid", kernel_source))
             .output()
             .expect("Failed to sequence patches");
 
