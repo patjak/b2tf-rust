@@ -274,7 +274,8 @@ fn handle_git_state(options: &Options, log: &mut Log) -> Result<bool, Box<dyn Er
         if session.unmerged_paths.is_empty() && session.modified_paths.is_empty() {
             Git::cmd("cherry-pick --abort".to_string(), &git_dir)?;
             log.commit_update(next_hash, "empty")?;
-            return Ok(false);
+            println!("{} {}", "Empty commit:".bright_blue(), next_hash.bright_blue());
+            return Ok(true);
         }
 
         // If we have conflicts then edit them
