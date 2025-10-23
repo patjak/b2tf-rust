@@ -133,6 +133,10 @@ impl Log {
                 commits.push('\n');
             }
         }
+
+        // Remove the last newline in the log
+        commits.pop();
+
         self.commits = commits;
         self.save()?;
         Ok(())
