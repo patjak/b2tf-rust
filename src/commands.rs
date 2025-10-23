@@ -280,8 +280,8 @@ fn handle_git_state(options: &Options, log: &mut Log) -> Result<bool, Box<dyn Er
 
         // If we have conflicts then edit them
         if !session.unmerged_paths.is_empty() {
-            cmd_edit(options, log)?;
-            return Ok(false);
+            let handled = cmd_edit(options, log)?;
+            return Ok(handled);
         }
 
         // Check if all conflicts are resolved so we can update log and continue
@@ -445,7 +445,7 @@ fn find_conflict_lineno(file: String) -> Result<String, Box<dyn Error>> {
     Ok(lineno)
 }
 
-pub fn cmd_edit(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
+pub fn cmd_edit(options: &Options, log: &mut Log) -> Result<bool, Box<dyn Error>> {
     let git_dir = options.git_dir.clone().unwrap();
     let range_stop = options.range_stop.clone().unwrap();
     let session = Git::get_session(&git_dir)?;
@@ -468,7 +468,7 @@ pub fn cmd_edit(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> 
                 "a" => return Err("Aborted by user".into()),
                 "s" => {
                     cmd_skip(options, log)?;
-                    return Ok(());
+                    return Ok(true);
                 },
                 _ => val,
             };
@@ -511,7 +511,7 @@ pub fn cmd_edit(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> 
         }
     }
 
-    Ok(())
+    Ok(false)
 }
 
 pub fn cmd_status(options: &Options, log: &Log) -> Result<(), Box<dyn Error>> {
