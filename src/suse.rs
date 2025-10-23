@@ -80,7 +80,7 @@ pub fn cmd_suse_export(options: &Options, log: &Log) -> Result<(), Box<dyn Error
         i += 1;
         println!("{}/{}:\t{}", i, total, file_name);
 
-        // Update the From header with the upstream hash
+        // Get downstream hash from "From" header
         let mut contents: String = fs::read_to_string(&file_path)?.parse()?;
         let mut lines: Vec<&str> = contents.split("\n").collect();
         let mut cols: Vec<&str> = lines[0].split(" ").collect();
@@ -88,52 +88,26 @@ pub fn cmd_suse_export(options: &Options, log: &Log) -> Result<(), Box<dyn Error
             return Err(format!("Invalid patch file: {}", file_path).into());
         }
 
-        let hash_down = log.get_upstream(cols[1])?;
-        cols[1] = &hash_down;
+        // Update "From" header with upstream hash
+        let hash_up = log.get_upstream(cols[1])?;
+        cols[1] = &hash_up;
         let line = cols.join(" ");
         lines[0] = &line;
         contents = lines.join("\n");
-
         fs::write(&file_path, contents)?;
 
-        let query = format!("LINUX_GIT={} {}/scripts/patch-tags-from-git {}",
-                            git_dir, kernel_source, file_path);
-        let output = Cmd::new("sh")
-            .arg("-c")
-            .arg(&query)
-            .output()
-            .expect(format!("Failed to update tags in {}", file_path).as_str());
+        // Add Git-commit tag
+        add_suse_tag(&file_path, &kernel_source, "Git-commit", &hash_up)?;
 
-        let stderr = String::from_utf8(output.stderr).expect("Invalid UTF8");
-
-        if !output.status.success() {
-            println!("{}", stderr);
-            return Err(format!("Failed to run patch-tags-from-git on: {}", file_path).into());
-        }
+        // Add mainline tag
+        let mainline = get_mainline_tag(&hash_up, &git_dir)?;
+        add_suse_tag(&file_path, &kernel_source, "Patch-mainline", &mainline)?;
 
         // Add Acked-by tag
-        let query = format!("{}/scripts/patch-tag --Add \"Acked-by={}\" {}", kernel_source, signature, file_path);
-        let output = Cmd::new("sh")
-            .arg("-c")
-            .arg(&query)
-            .output()
-            .expect(format!("Failed to execute: {}", query).as_str());
-
-        if !output.status.success() {
-            return Err(format!("Failed to add signature to {}", file_path).as_str().into());
-        }
+        add_suse_tag(&file_path, &kernel_source, "Acked-by", &signature)?;
 
         // Add References tag
-        let query = format!("{}/scripts/patch-tag --Add \"References={}\" {}", kernel_source, references, file_path);
-        let output = Cmd::new("sh")
-            .arg("-c")
-            .arg(&query)
-            .output()
-            .expect(format!("Failed to execute: {}", query).as_str());
-
-        if !output.status.success() {
-            return Err(format!("Failed to add signature to {}", file_path).as_str().into());
-        }
+        add_suse_tag(&file_path, &kernel_source, "References", &references)?;
     }
     Ok(())
 }
@@ -268,7 +242,7 @@ fn set_suse_tag(file_path: &String, kernel_source: &String, tag: &str, value: &s
 }
 
 fn add_suse_tag(file_path: &String, kernel_source: &String, tag: &str, value: &str) -> Result <(), Box<dyn Error>> {
-    let query = format!("{}/scripts/patch-tag --add {}='{}' {}", kernel_source, tag, value, file_path);
+    let query = format!("{}/scripts/patch-tag --Add {}='{}' {}", kernel_source, tag, value, file_path);
     let output = Cmd::new("sh")
         .arg("-c")
         .arg(query)
@@ -283,6 +257,14 @@ fn add_suse_tag(file_path: &String, kernel_source: &String, tag: &str, value: &s
     }
 
     Ok(())
+}
+
+fn get_mainline_tag(hash: &str, git_dir: &String) -> Result<String, Box<dyn Error>> {
+    let line = Git::cmd(format!("describe --contains --match 'v*' {}", hash), git_dir)?;
+    let tag: Vec<&str> = line.split("~").collect();
+    let mainline = tag[0].to_string();
+
+    Ok(mainline)
 }
 
 fn get_ref_link(r: &str) -> String {
