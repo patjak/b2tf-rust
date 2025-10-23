@@ -13,6 +13,7 @@ use crate::git::*;
 use clap::ArgMatches;
 use std::fmt::Debug;
 use std::error::Error;
+use colored::Colorize;
 
 #[derive(Debug)]
 pub struct Options {
@@ -107,9 +108,22 @@ fn main() -> Result<(), Box<dyn Error>> {
     let matches = command.clone().get_matches();
     if let Some(_matches) = matches.subcommand_matches("setup") {
         cmd_setup(&matches)?;
+        println!("{}", "b2tf.log file created".green());
+        return Ok(());
     }
 
-    log.load()?;
+    match log.load() {
+        Err(_error) => {
+            if !matches.args_present() {
+                command.print_help()?;
+            } else {
+                println!("{}", "\nFailed to open b2tf.log. Run setup to create it.".red());
+            }
+            return Ok(());
+        },
+        _ => {},
+    };
+
     let mut options = Options::new();
 
     options.parse(&matches, &log)?;
