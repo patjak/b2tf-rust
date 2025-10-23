@@ -397,7 +397,7 @@ fn sequence_patch(kernel_source: &String, file_name: &String, paths: &Vec<PathBu
             break;
         }
 
-        let hunk: Vec<&str> = stderr.split("\nPatch ").collect();
+        let hunk: Vec<&str> = stderr.split("Patch ").collect();
         let lines: Vec<&str> = hunk[1].split("\n").collect();
         let cols: Vec<&str> = lines[0].split(" ").collect();
         let failed_patch = cols[0];
