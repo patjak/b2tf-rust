@@ -19,19 +19,19 @@ pub fn cmd_suse(options: &mut Options, log: &Log, subcommand: &mut Command, matc
     if signature.is_some() {
         options.signature = signature;
     } else if options.signature.is_none() {
-        return Err("suse subcommands requires option --signature to be specified".into());
+        return Err("suse subcommands requires option --signature to be specified".red().into());
     }
 
     if references.is_some() {
         options.references = references;
     } else if options.references.is_none() {
-        return Err("suse subcommands require option --references to be specified".into());
+        return Err("suse subcommands require option --references to be specified".red().into());
     }
 
     if kernel_source.is_some() {
         options.kernel_source = kernel_source;
     } else if options.kernel_source.is_none() {
-        return Err("suse subcommands require option --suse-kernel-source to be specified".into());
+        return Err("suse subcommands require option --suse-kernel-source to be specified".red().into());
     }
 
     match matches.subcommand() {
@@ -85,7 +85,7 @@ pub fn cmd_suse_export(options: &Options, log: &Log) -> Result<(), Box<dyn Error
         let mut lines: Vec<&str> = contents.split("\n").collect();
         let mut cols: Vec<&str> = lines[0].split(" ").collect();
         if cols[0] != "From" || cols[1].len() != 40 {
-            return Err(format!("Invalid patch file: {}", file_path).into());
+            return Err(format!("Invalid patch file: {}", file_path).red().into());
         }
 
         // Update "From" header with upstream hash
@@ -139,7 +139,7 @@ fn remove_blacklist_entry(hash: &str, kernel_source: &str) -> Result<(), Box<dyn
 // Returns all git-commit and alt-commit tags from patch
 fn get_git_commits_from_patch(file_path: &String) -> Result<Vec<String>, Box<dyn Error>> {
     if !fs::exists(file_path)? {
-        return Err(format!("File not found: {}", file_path).into());
+        return Err(format!("File not found: {}", file_path).red().into());
 
     }
 
@@ -235,7 +235,7 @@ fn set_suse_tag(file_path: &String, kernel_source: &String, tag: &str, value: &s
 
     if !output.status.success() {
         println!("{}", stderr);
-        return Err("Failed to set SUSE tag".into());
+        return Err("Failed to set SUSE tag".red().into());
     }
 
     Ok(())
@@ -253,7 +253,7 @@ fn add_suse_tag(file_path: &String, kernel_source: &String, tag: &str, value: &s
 
     if !output.status.success() {
         println!("{}", stderr);
-        return Err("Failed to add SUSE tag".into());
+        return Err("Failed to add SUSE tag".red().into());
     }
 
     Ok(())
@@ -320,7 +320,7 @@ fn copy_patch(src: &String, dst: &String, kernel_source: &String) -> Result<(), 
         .expect("Failed to copy patch");
 
     if !status.success() {
-        return Err("Failed to copy patch".into());
+        return Err("Failed to copy patch".red().into());
     }
 
     Ok(())
@@ -338,12 +338,12 @@ fn copy_references(src_path: &String, dst_path: &String, kernel_source: &String)
 
     if src_tag.is_empty() {
         println!("{:?}", src_tag);
-        return Err(format!("Source patch didn't have a references tag: {}", src_path).into());
+        return Err(format!("Source patch didn't have a references tag: {}", src_path).red().into());
     }
     let src_refs: Vec<&str> = src_tag[0].split(" ").collect();
 
     if dst_tag.is_empty() {
-        return Err("Destination patch didn't have a referecnes tag".into());
+        return Err("Destination patch didn't have a referecnes tag".red().into());
     }
     let dst_refs: Vec<&str> = dst_tag[0].split(" ").collect();
 
@@ -377,7 +377,7 @@ fn series_sort(kernel_source: &String) -> Result<(), Box<dyn Error>> {
         .expect("Failed to sort series.conf");
 
     if !status.success() {
-        return Err("Failed to sort series.conf".into());
+        return Err("Failed to sort series.conf".red().into());
     }
 
     Ok(())
@@ -445,7 +445,7 @@ fn sequence_patch(kernel_source: &String, file_name: &String, paths: &Vec<PathBu
             },
             "a" => {
                 series_remove(kernel_source, file_name)?;
-                return Err("Aborted by user".into());
+                return Err("Aborted by user".red().into());
             },
             _ => (),
         }
@@ -468,7 +468,7 @@ fn series_insert(kernel_source: &String, file_name: &String) -> Result<(), Box<d
 
     if !output.status.success() {
         println!("{}", stderr);
-        return Err("series insert failed".into());
+        return Err("series insert failed".red().into());
     }
 
     Ok(())
@@ -488,7 +488,7 @@ fn series_remove(kernel_source: &String, file_name: &String) -> Result<(), Box<d
 
     if !output.status.success() {
         println!("{}", stderr);
-        return Err("series remove failed".into());
+        return Err("series remove failed".red().into());
     }
 
     Ok(())
@@ -516,7 +516,7 @@ fn suse_log(kernel_source: &String, msg: &str) -> Result<(), Box<dyn Error>> {
         let stderr = String::from_utf8(output.stderr).expect("Invalid UTF8");
 
         println!("{}", stderr);
-        return Err("Failed to run scripts/log".into());
+        return Err("Failed to run scripts/log".red().into());
     }
 
     Ok(())
@@ -550,7 +550,7 @@ fn insert_guard(file_name: &str, kernel_source: &String, processed_commits: &mut
 
     // Check series.conf if patch is already guarded
     if check_guard(file_name, kernel_source)?.is_some() {
-        return Err("Patch is already guarded".into());
+        return Err("Patch is already guarded".red().into());
     }
 
     // Make sure we're not guarding an already processed commit
@@ -599,7 +599,7 @@ fn remove_guard(file_name: &str, kernel_source: &String) -> Result<(), Box<dyn E
     let lines: Vec<&str> = file.split("\n").collect();
 
     if !check_guard(file_name, kernel_source)?.is_some() {
-        return Err("Patch is not guarded".into());
+        return Err("Patch is not guarded".red().into());
     }
 
     let mut result_str = String::new();
@@ -629,7 +629,7 @@ fn replace_patch(file_path: &String, suse_path: &String, kernel_source: &String,
 
     let refs = get_suse_tags(&suse_path, &kernel_source, "References")?;
     if refs.len() < 1 {
-        return Err("Missing references tag".into());
+        return Err("Missing references tag".red().into());
     }
     let refs: Vec<&str> = refs[0].split(" ").collect();
     println!(" ({})", &refs.join(" "));
@@ -691,7 +691,7 @@ fn replace_patch(file_path: &String, suse_path: &String, kernel_source: &String,
                         .expect("Failed to show diff");
                 },
                 "s" => {
-                    return Err("Stopped by user".into());
+                    return Err("Stopped by user".red().into());
                 },
                 _ => (),
             };
@@ -767,7 +767,7 @@ pub fn cmd_suse_apply(options: &Options) -> Result<(), Box<dyn Error>> {
             if comp_res == CompareResult::Identical || comp_res == CompareResult::Same {
                 let query = format!("ls-files --error-unmatch {} > /dev/null", suse_path.0);
                 if !Git::cmd_passthru(query, &kernel_source)? {
-                    return Err("Patch was applied but not committed. Fix the state of the kernel-source before continuing".into());
+                    return Err("Patch was applied but not committed. Fix the state of the kernel-source before continuing".red().into());
                 }
 
                 if unguarding {

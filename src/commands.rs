@@ -18,7 +18,7 @@ pub fn cmd_setup(matches: &ArgMatches) -> Result<(), Box<dyn Error>> {
     let mut log = Log::new();
 
     if fs::exists(&log.filename)? {
-        return Err("b2tf.log already exists. Will not overwrite an existing configuration.".into());
+        return Err("b2tf.log already exists. Will not overwrite an existing configuration.".red().into());
     }
 
     options.parse_matches(matches);
@@ -26,17 +26,17 @@ pub fn cmd_setup(matches: &ArgMatches) -> Result<(), Box<dyn Error>> {
     if options.range_start.is_some() {
         log.config.push_str(format!("range-start: {}\n", &options.range_start.unwrap()).as_str());
     } else {
-        return Err("--range-start must be specified".into());
+        return Err("--range-start must be specified".red().into());
     }
     if options.range_stop.is_some() {
         log.config.push_str(format!("range-stop: {}\n", &options.range_stop.unwrap()).as_str());
     } else {
-        return Err("--range-stop must be specified".into());
+        return Err("--range-stop must be specified".red().into());
     }
     if options.branch.is_some() {
         log.config.push_str(format!("branch: {}\n", &options.branch.unwrap()).as_str());
     } else {
-        return Err("--branch must be specified".into());
+        return Err("--branch must be specified".red().into());
     }
     if options.branch_point.is_some() {
         log.config.push_str(format!("branch-point: {}\n", &options.branch_point.unwrap()).as_str());
@@ -47,7 +47,7 @@ pub fn cmd_setup(matches: &ArgMatches) -> Result<(), Box<dyn Error>> {
     if options.git_dir.is_some() {
         log.config.push_str(format!("git-dir: {}\n", &options.git_dir.unwrap()).as_str());
     } else {
-        return Err("--git-dir must be specified.".into());
+        return Err("--git-dir must be specified.".red().into());
     }
     if options.paths.is_some() {
         log.config.push_str(format!("paths: {}\n", &options.paths.unwrap()).as_str());
@@ -115,12 +115,12 @@ fn get_cherrypick_cache(options: &Options) -> Result<Vec<(String, String)>, Box<
         let commit = Git::show(&hash, &git_dir)?;
         let sections: Vec<_> = commit.body.split("(cherry picked from commit ").collect();
         if sections.len() != 2 {
-            return Err("Invalid commit with multiple cherry pick lines".into());
+            return Err("Invalid commit with multiple cherry pick lines".red().into());
         }
         let section = sections[1];
         let cherrypick = section[..40].to_string();
         if cherrypick.len() != 40 || hash.len() != 40 {
-            return Err("NOOOO!".into());
+            return Err("NOOOO!".red().into());
         }
         cache.push((hash, cherrypick));
     }
@@ -302,7 +302,7 @@ fn handle_git_state(options: &Options, log: &mut Log) -> Result<bool, Box<dyn Er
             return Ok(false);
         }
     } else if session.state != GitSessionState::None {
-        return Err("In session".into());
+        return Err("In session".red().into());
     }
 
     Ok(false)
@@ -392,7 +392,7 @@ pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>>
 
                 // If the user didn't fix the conflict we abort
                 if !session.unmerged_paths.is_empty() {
-                    return Err("Conflict not resolved".into());
+                    return Err("Conflict not resolved".red().into());
                 }
             },
         }
@@ -465,7 +465,7 @@ pub fn cmd_edit(options: &Options, log: &mut Log) -> Result<bool, Box<dyn Error>
 
             match val {
                 "n" => break,
-                "a" => return Err("Aborted by user".into()),
+                "a" => return Err("Aborted by user".red().into()),
                 "s" => {
                     cmd_skip(options, log)?;
                     return Ok(true);
@@ -757,7 +757,7 @@ pub fn cmd_rebase(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>
     }
 
     if session.state != GitSessionState::Rebase && session.state != GitSessionState::None {
-        return Err("Invalid session state.".into());
+        return Err("Invalid session state.".red().into());
     }
 
     loop {
@@ -792,7 +792,7 @@ pub fn cmd_rebase(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>
 
         if subject_down != subject_up {
             return Err(format!("Log is out of sync with git repository at:\nGit: {} {}\nLog: {} {}",
-                               hash_up, subject_up, hash_down, subject_down).into());
+                               hash_up, subject_up, hash_down, subject_down).red().into());
         }
 
         j += 1;
@@ -811,7 +811,7 @@ pub fn cmd_prepend(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error
 
     match &options.hash {
         Some(arg) => hash_arg = arg,
-        None => return Err("No --hash was provided".into()),
+        None => return Err("No --hash was provided".red().into()),
     };
 
     // Create a string to prepend to the commits log
@@ -838,7 +838,7 @@ pub fn cmd_append(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>
 
     match &options.hash {
         Some(arg) => hash_arg = arg,
-        None => return Err("No --hash was provided".into()),
+        None => return Err("No --hash was provided".red().into()),
     };
 
     // Create a string to append to the commits log
@@ -866,7 +866,7 @@ pub fn cmd_insert(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>
 
     match &options.hash {
         Some(arg) => hash_arg = arg,
-        None => return Err("No --hash was provided".into()),
+        None => return Err("No --hash was provided".red().into()),
     };
 
     match &options.after {
@@ -875,7 +875,7 @@ pub fn cmd_insert(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>
     };
 
     if after.is_empty() {
-        return Err("Argument --after must be specified".into());
+        return Err("Argument --after must be specified".red().into());
     }
 
     let mut insert = String::new();

@@ -134,16 +134,16 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Check for all required options
     if options.range_start.is_none() {
-        return Err("Missing option: range-start".into());
+        return Err("Missing option: range-start".red().into());
     }
     if options.range_stop.is_none() {
-        return Err("Missing option: range-stop".into());
+        return Err("Missing option: range-stop".red().into());
     }
     if options.branch.is_none() {
-        return Err("Missing option: branch".into());
+        return Err("Missing option: branch".red().into());
     }
     if options.git_dir.is_none() {
-        return Err("Missing option: git-dir".into());
+        return Err("Missing option: git-dir".red().into());
     }
 
     // Set defaults to missing options

@@ -3,6 +3,7 @@ use std::fs;
 use std::error::Error;
 use crate::cli::*;
 use crate::Options;
+use colored::Colorize;
 
 #[derive(Debug, Clone)]
 pub struct Log {
@@ -28,7 +29,7 @@ impl Log {
         self.commits = String::from(slices[1]);
 
         if slices.len() != 2 {
-            return Err("Log::Load() Invalid format".into());
+            return Err("Log::Load() Invalid format".red().into());
         }
 
         Ok(())
@@ -222,7 +223,7 @@ impl Log {
         }
 
         if last_applied.is_empty() {
-            return Err("No last applied commit found".into());
+            return Err("No last applied commit found".red().into());
         }
 
         Ok(last_applied)
@@ -236,6 +237,6 @@ impl Log {
                 return Ok(commit.0);
             }
         }
-        Err(format!("Failed to find upstream hash for downstream hash {}", hash).into())
+        Err(format!("Failed to find upstream hash for downstream hash {}", hash).red().into())
     }
 }
