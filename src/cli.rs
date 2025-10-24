@@ -106,6 +106,7 @@ impl Cli {
             .subcommand(
                 Command::new("suse")
                     .about("SUSE specific subcommands")
+                    .arg_required_else_help(true)
                     .arg(Arg::new("signature")
                         .long("signature")
                     )
