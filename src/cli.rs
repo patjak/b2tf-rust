@@ -9,6 +9,7 @@ impl Cli {
             .name("b2tf")
             .display_name("Back 2 The Future")
             .author("Patrik Jakobsson <patrik.r.jakobsson@gmail.com>")
+            .arg_required_else_help(true)
             .arg(Arg::new("debug")
                 .long("debug")
                 .action(ArgAction::SetTrue)

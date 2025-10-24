@@ -114,11 +114,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     match log.load() {
         Err(_error) => {
-            if !matches.args_present() {
-                command.print_help()?;
-            } else {
-                println!("{}", "\nFailed to open b2tf.log. Run setup to create it.".red());
-            }
+            println!("{}", "\nFailed to open b2tf.log. Run setup to create it.".red());
             return Ok(());
         },
         _ => {},
