@@ -82,6 +82,7 @@ impl Cli {
             .subcommand(
                 Command::new("prepend")
                     .about("add commit hash to beginning of log")
+                    .arg_required_else_help(true)
                     .arg(Arg::new("hashes to prepend")
                         .long("hash")
                     )
@@ -89,6 +90,7 @@ impl Cli {
             .subcommand(
                 Command::new("append")
                     .about("add commit hash to end of log")
+                    .arg_required_else_help(true)
                     .arg(Arg::new("hashes to append")
                         .long("hash")
                     )
@@ -96,6 +98,7 @@ impl Cli {
             .subcommand(
                 Command::new("insert")
                     .about("insert hashes before or after specified hash")
+                    .arg_required_else_help(true)
                     .arg(Arg::new("hashes to append")
                         .long("hash")
                     )
