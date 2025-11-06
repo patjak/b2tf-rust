@@ -10,7 +10,7 @@ use crate::Options;
 use crate::Log;
 use crate::Util;
 use crate::git::{Git, GitSessionState};
-use unidiff::PatchSet;
+use unidiff::{PatchSet, PatchedFile, Hunk};
 use mktemp::Temp;
 
 pub fn cmd_setup(matches: &ArgMatches) -> Result<(), Box<dyn Error>> {
@@ -601,6 +601,34 @@ pub fn cmd_skip(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> 
     Ok(())
 }
 
+fn print_hunk(hunk: &Hunk) {
+    print!("{}", format!("@@ -{},{} ", hunk.source_start, hunk.source_length).cyan());
+    print!("{}", format!("+{},{} @@ ", hunk.target_start, hunk.target_length).cyan());
+    println!("{}", hunk.section_header);
+    for line in hunk.clone() {
+        if line.line_type == "+" {
+            println!("{} {}", line.line_type.green(), line.value.green());
+        } else if line.line_type == "-" {
+            println!("{} {}", line.line_type.red(), line.value.red());
+        } else {
+            println!("{} {}", line.line_type, line.value);
+        }
+    }
+}
+
+fn print_patched_file_header(file: &PatchedFile) {
+    println!("--- {}", file.source_file);
+    println!("+++ {}", file.target_file);
+}
+
+fn print_patched_file(file: &PatchedFile) {
+    print_patched_file_header(&file);
+
+    for hunk in file.clone() {
+        print_hunk(&hunk);
+    }
+}
+
 pub fn cmd_diff(options: &Options) -> Result<(), Box<dyn Error>> {
     let git_dir = options.git_dir.clone().unwrap();
     let branch = options.branch.clone().unwrap();
@@ -612,22 +640,7 @@ pub fn cmd_diff(options: &Options) -> Result<(), Box<dyn Error>> {
     patch.parse(stdout).expect("Error parsing diff");
 
     for file in patch {
-        println!("--- {}", file.source_file);
-        println!("+++ {}", file.target_file);
-        for hunk in file {
-            print!("{}", format!("@@ -{},{} ", hunk.source_start, hunk.source_length).cyan());
-            print!("{}", format!("+{},{} @@ ", hunk.target_start, hunk.target_length).cyan());
-            println!("{}", hunk.section_header);
-            for line in hunk {
-                if line.line_type == "+" {
-                    println!("{} {}", line.line_type.green(), line.value.green());
-                } else if line.line_type == "-" {
-                    println!("{} {}", line.line_type.red(), line.value.red());
-                } else {
-                    println!("{} {}", line.line_type, line.value);
-                }
-            }
-        }
+        print_patched_file(&file);
     }
 
     Ok(())
