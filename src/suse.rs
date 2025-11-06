@@ -113,10 +113,11 @@ pub fn cmd_suse_export(options: &Options, log: &Log) -> Result<(), Box<dyn Error
 }
 
 // Remove a blacklist entry from a specified blacklist.conf file
-fn remove_blacklist_entry(hash: &str, kernel_source: &str) -> Result<(), Box<dyn Error>> {
+fn remove_blacklist_entry(hash: &str, kernel_source: &str) -> Result<bool, Box<dyn Error>> {
     let file_path = format!("{}/blacklist.conf", kernel_source);
     let contents: String = fs::read_to_string(&file_path)?.parse()?;
     let mut output: Vec<&str> = vec![];
+    let mut found = false;
 
     let lines: Vec<&str> = contents.split("\n").collect();
     for line in lines {
@@ -124,6 +125,7 @@ fn remove_blacklist_entry(hash: &str, kernel_source: &str) -> Result<(), Box<dyn
 
         if cols.len() > 0 && cols[0] == hash {
             println!("Removed blacklist entry:\n{}", line);
+            found = true;
             continue;
         }
 
@@ -133,7 +135,7 @@ fn remove_blacklist_entry(hash: &str, kernel_source: &str) -> Result<(), Box<dyn
     let output = output.join("\n");
     fs::write(&file_path, output)?;
 
-    Ok(())
+    Ok(found)
 }
 
 // Returns all git-commit and alt-commit tags from patch
@@ -189,13 +191,18 @@ pub fn cmd_suse_unblacklist(options: &Options) -> Result<(), Box<dyn Error>> {
                     .collect::<Result<Vec<_>, io::Error>>()?;
     paths.sort();
 
+    let mut i = 0;
     for path in paths {
         let file_path = path.display().to_string();
         let git_commits = get_git_commits_from_patch(&file_path)?;
         for hash in git_commits {
-            remove_blacklist_entry(&hash, &kernel_source)?;
+            if remove_blacklist_entry(&hash, &kernel_source)? {
+                i += 1;
+            }
         }
     }
+
+    println!("Found {} matching blacklist entries", i);
 
     Ok(())
 }
