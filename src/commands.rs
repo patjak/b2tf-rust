@@ -763,11 +763,16 @@ pub fn cmd_rebase(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>
 
         let query = format!("GIT_SEQUENCE_EDITOR='cp {} ' git -C {} rebase -i {}", filename, git_dir, branch_point);
 
-        Command::new("sh")
+        let status = Command::new("sh")
             .arg("-c")
             .arg(&query)
             .status()
             .expect(format!("Failed to execute: {}\n", &query).as_str());
+
+        if !status.success() {
+            println!("Rebase needs resolving");
+            return Ok(());
+        }
     }
 
     if session.state != GitSessionState::Rebase && session.state != GitSessionState::None {
@@ -790,8 +795,9 @@ pub fn cmd_rebase(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>
 
     let mut j: usize = 0;
     for i in 0..(commits.len() - 1) {
+
         // Skip everything that is not a backported commit
-        if commits[i].0.len() != 40 || commits[i].1.len() != 40 {
+        if commits[i].0.len() != 40 || (commits[i].1.len() != 40 && !commits[i].1.is_empty()) {
             continue;
         }
 
