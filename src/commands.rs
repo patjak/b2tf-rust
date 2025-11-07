@@ -733,7 +733,7 @@ pub fn cmd_diffstat(options: &Options) -> Result<(), Box<dyn Error>> {
 
 pub fn cmd_rebase(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
     let git_dir = options.git_dir.clone().unwrap();
-    let range_start = options.range_start.clone().unwrap();
+    let branch_point = options.branch_point.clone().unwrap();
     let commits = log.get_all()?;
     let last_commit = log.last_applied_commit()?;
     let temp_file = Temp::new_file()?;
@@ -761,7 +761,7 @@ pub fn cmd_rebase(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>
             }
         }
 
-        let query = format!("GIT_SEQUENCE_EDITOR='cp {} ' git -C {} rebase -i {}", filename, git_dir, range_start);
+        let query = format!("GIT_SEQUENCE_EDITOR='cp {} ' git -C {} rebase -i {}", filename, git_dir, branch_point);
 
         Command::new("sh")
             .arg("-c")
@@ -784,7 +784,7 @@ pub fn cmd_rebase(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>
 
     // Rebase succeeded. Now rebuild the commit list
     println!("");
-    let stdout = Git::cmd(format!("log --oneline --reverse --format='%H %s' {}..", range_start), &git_dir)?;
+    let stdout = Git::cmd(format!("log --oneline --reverse --format='%H %s' {}..", branch_point), &git_dir)?;
     let lines: Vec<&str> = stdout.split("\n").collect();
     let commits = log.get_all()?;
 
