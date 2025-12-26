@@ -480,7 +480,10 @@ pub fn cmd_edit(options: &Options, log: &mut Log) -> Result<bool, Box<dyn Error>
             Git::cmd(format!("show {} > {}", commit, commit_file), &git_dir)?;
 
             // Store the target version of the file (eg git show v5.5:<filepath>)
-            Git::cmd(format!("show {}:{} > {}", range_stop, file, target_file), &git_dir)?;
+            match Git::cmd(format!("show {}:{} > {}", range_stop, file, target_file), &git_dir) {
+                Err(_error) => println!("{} {} {} {}", "Target file", file.red(), "doesn't exist at revision", range_stop.red()),
+                _ => (),
+            }
 
             // FIXME: Add support for other editors than vim
             Command::new("sh")
