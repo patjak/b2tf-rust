@@ -742,6 +742,7 @@ pub fn cmd_rebase(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>
     let mut file = fs::File::create(&temp_file)?;
     let session = Git::get_session(&git_dir)?;
 
+    // Generate a pick-file to feed into git-rebase
     if session.state == GitSessionState::None {
         for hash in commits {
             let mut picked_hash = &hash.0;
@@ -771,7 +772,6 @@ pub fn cmd_rebase(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>
 
         if !status.success() {
             println!("Rebase needs resolving");
-            return Ok(());
         }
     }
 
@@ -779,6 +779,7 @@ pub fn cmd_rebase(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>
         return Err("Invalid session state.".red().into());
     }
 
+    // Loop through all rebase conflicts and let user handle them
     loop {
         let session = Git::get_session(&git_dir)?;
         if session.state == GitSessionState::None {
@@ -797,27 +798,28 @@ pub fn cmd_rebase(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>
     for i in 0..(commits.len() - 1) {
 
         // Skip everything that is not a backported commit
-        if commits[i].0.len() != 40 || (commits[i].1.len() != 40 && !commits[i].1.is_empty()) {
+        if commits[i].1.len() != 40 && !commits[i].1.is_empty(){
             continue;
         }
 
         let commit = Git::show(&commits[i].0, &git_dir)?;
-        let hash_up = commit.hash;
-        let subject_up = commit.subject;
+        let hash_log = commit.hash;
+        let subject_log = commit.subject;
 
         let mut cols: Vec<&str> = lines[j].split(" ").collect();
+        let hash_git = &cols.remove(0);
+        let subject_git = cols.join(" ");
 
-        let hash_down = &cols.remove(0);
-        let subject_down = cols.join(" ");
-
-        if subject_down != subject_up {
+        if subject_git != subject_log {
             return Err(format!("Log is out of sync with git repository at:\nGit: {} {}\nLog: {} {}",
-                               hash_up, subject_up, hash_down, subject_down).red().into());
+                               hash_git, subject_git, hash_log, subject_log).red().into());
         }
 
         j += 1;
-        print!("\rUpdating log: {}/{}", j, lines.len() - 1);
-        log.commit_update(&hash_up, &hash_down)?;
+        if commits[i].1 != *hash_git {
+            print!("\rUpdating log: {}/{}", j, lines.len() - 1);
+            log.commit_update(&hash_log, &hash_git)?;
+        }
     }
 
     println!("\nRebase done");
