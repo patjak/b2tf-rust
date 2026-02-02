@@ -1,8 +1,8 @@
 extern crate unidiff;
-use std::error::Error;
 use colored::Colorize;
 use unidiff::{PatchSet, PatchedFile, Hunk, Line};
 
+#[derive(Clone)]
 #[derive(Debug)]
 pub struct PatchLine {
     pub source_line_no: Option<usize>,
@@ -55,6 +55,7 @@ impl PatchLine {
     }
 }
 
+#[derive(Clone)]
 #[derive(Debug)]
 pub struct PatchHunk {
     pub source_start: usize,
@@ -105,7 +106,7 @@ impl PatchHunk {
             return false;
         }
 
-        if fuzz {
+        if !fuzz {
             if self.source_start != hunk.source_start ||
                self.source_length != hunk.source_length ||
                self.target_start != hunk.target_start ||
@@ -131,6 +132,7 @@ impl PatchHunk {
 
 }
 
+#[derive(Clone)]
 #[derive(Debug)]
 pub struct PatchFile {
     pub source_file: String,
@@ -189,9 +191,10 @@ impl PatchFile {
     }
 }
 
+#[derive(Clone)]
 #[derive(Debug)]
 pub struct Patch {
-    files: Vec<PatchFile>,
+    pub files: Vec<PatchFile>,
 }
 
 impl Patch {
@@ -207,17 +210,44 @@ impl Patch {
         }
     }
 
-    pub fn parse(&mut self, diff: &String) -> Result<(), Box<dyn Error>> {
+    pub fn parse(&mut self, diff: &String) {
         let mut unidiff = PatchSet::new();
         unidiff.parse(diff).expect("Error parsing diff with unidiff");
-
-        let mut patch = Patch::new();
 
         for file in unidiff {
             let mut f = PatchFile::new();
             f.parse(file);
             self.files.push(f);
         }
-        Ok(())
+    }
+
+    pub fn subtract(&mut self, patch: Patch, fuzz: bool) {
+        // Make sure we don't overflow the subtractions below
+        if patch.files.len() == 0 || self.files.len() == 0 {
+            return;
+        }
+
+        for i in 0..(patch.files.len() - 1) {
+            for j in 0..(self.files.len() - 1){
+                let file_a = self.files[j].clone();
+                let file_b = &patch.files[i];
+
+                if file_a.compare(&file_b, fuzz) {
+                    self.files.remove(j);
+                    continue;
+                }
+
+                for k in 0..patch.files[i].hunks.len() {
+                    for l in 0..self.files[j].hunks.len() {
+                        let hunk_a = &file_a.hunks[l];
+                        let hunk_b = &file_b.hunks[k];
+
+                        if hunk_a.compare(hunk_b, fuzz) {
+                            self.files[j].hunks.remove(l);
+                        }
+                    }
+                }
+            }
+        }
     }
 }
