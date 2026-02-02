@@ -70,6 +70,9 @@ impl Cli {
             .subcommand(
                 Command::new("diffdiff")
                     .about("show diff between your branch and <range stop> without diff from branch and <range start>")
+                    .arg(Arg::new("comma separated list of commits to skip")
+                        .long("skip")
+                    )
             )
             .subcommand(
                 Command::new("diffstat")

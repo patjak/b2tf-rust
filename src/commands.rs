@@ -1,4 +1,3 @@
-extern crate unidiff;
 use std::process::Command;
 use std::error::Error;
 use std::path::Path;
@@ -9,6 +8,7 @@ use colored::Colorize;
 use crate::Options;
 use crate::Log;
 use crate::Util;
+use crate::patch::Patch;
 use crate::git::{Git, GitSessionState};
 use unidiff::{PatchSet, PatchedFile, Hunk};
 use mktemp::Temp;
@@ -649,27 +649,6 @@ pub fn cmd_diff(options: &Options) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn compare_hunks(hunk1: &Hunk, hunk2: &Hunk) -> bool {
-    if hunk1.section_header != hunk2.section_header {
-        return false;
-    }
-
-    let mut index = 0;
-
-    for line1 in hunk1.lines() {
-        let line2 = hunk2.lines()[index].clone();
-        index += 1;
-
-        if line1.value != line2.value ||
-           line1.line_type != line2.line_type {
-               println!("FAIL {} {}", line1.value, line2.value);
-               return false;
-        }
-    }
-
-    true
-}
-
 pub fn cmd_diffdiff(options: &Options) -> Result<(), Box<dyn Error>> {
     let git_dir = options.git_dir.clone().unwrap();
     let branch = options.branch.clone().unwrap();
@@ -677,46 +656,37 @@ pub fn cmd_diffdiff(options: &Options) -> Result<(), Box<dyn Error>> {
     let range_start = options.range_start.clone().unwrap();
     let range_stop = options.range_stop.clone().unwrap();
     let paths = options.paths.clone().unwrap();
+    let mut skip = String::new();
+
+    match &options.skip {
+        Some(arg) => skip = arg.to_string(),
+        None => (),
+    };
+
+    let skip_hashes: Vec<&str> = skip.split(",").collect();
 
     let diff_start = Git::cmd(format!("diff {branch_point} {range_start} -- {paths}").to_string(), &git_dir)?;
     let diff_stop = Git::cmd(format!("diff {branch} {range_stop} -- {paths}").to_string(), &git_dir)?;
 
-    let mut patch_start = PatchSet::new();
-    patch_start.parse(diff_start).expect("Error parsing start diff");
+    let mut patch_start = Patch::new();
+    patch_start.parse(&diff_start);
 
-    let mut patch_stop = PatchSet::new();
-    patch_stop.parse(diff_stop).expect("Error parsing stop diff");
+    let mut patch_stop = Patch::new();
+    patch_stop.parse(&diff_stop);
 
-    for file_stop in patch_stop {
-        let mut file_found = false;
+    patch_stop.subtract(patch_start, false);
 
-        for file_start in patch_start.files() {
-            if file_stop.source_file == file_start.source_file &&
-               file_stop.target_file == file_start.target_file {
-                   file_found = true;
-            } else {
-                continue;
-            }
-            for hunk_stop in file_stop.hunks() {
-                let mut hunk_found = false;
-
-                for hunk_start in file_start.hunks() {
-                    if file_found && compare_hunks(&hunk_stop, &hunk_start) {
-                        hunk_found = true;
-                    }
-                }
-
-                if !hunk_found && file_found {
-                    print_patched_file_header(&file_stop);
-                    print_hunk(&hunk_stop);
-                }
-            }
+    for s in skip_hashes {
+        if s.is_empty() {
+            continue;
         }
-
-        if !file_found {
-            print_patched_file(&file_stop);
-        }
+        let diff_skip = Git::cmd(format!("diff {s}~1..{s}").to_string(), &git_dir)?;
+        let mut patch_skip = Patch::new();
+        patch_skip.parse(&diff_skip);
+        patch_stop.subtract(patch_skip, true);
     }
+
+    patch_stop.print();
 
     Ok(())
 }

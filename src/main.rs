@@ -4,6 +4,7 @@ mod commands;
 mod git;
 mod util;
 mod suse;
+mod patch;
 use crate::log::*;
 use crate::cli::*;
 use crate::commands::*;
@@ -29,6 +30,7 @@ pub struct Options {
     pub kernel_source:  Option<String>,
     pub hash:           Option<String>,
     pub after:          Option<String>,
+    pub skip:           Option<String>,
 }
 
 impl Options {
@@ -46,6 +48,7 @@ impl Options {
             kernel_source: None,
             hash: None,
             after: None,
+            skip: None,
         }
     }
 
@@ -77,6 +80,12 @@ impl Options {
 
             let after = insert_matches.unwrap().get_one::<String>("insert after this hash").cloned();
             if after.is_some() { self.after = after }
+        }
+
+        let diffdiff_matches = matches.subcommand_matches("diffdiff");
+        if diffdiff_matches.is_some() {
+            let skip = diffdiff_matches.unwrap().get_one::<String>("comma separated list of commits to skip").cloned();
+            if skip.is_some() { self.skip = skip }
         }
 
         if range_start.is_some() { self.range_start = range_start }
