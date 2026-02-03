@@ -375,6 +375,7 @@ pub fn cmd_apply(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>>
                             println!("{} {}", "Found duplicate:".yellow(), cache_item.0);
                             is_duplicate = true;
                             log.commit_update(next_hash, format!("duplicate {}", cache_item.0).as_str())?;
+                            Git::cmd("cherry-pick --abort".to_string(), &git_dir)?;
                             break;
                         }
                     }
