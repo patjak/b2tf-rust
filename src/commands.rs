@@ -261,6 +261,22 @@ fn compare_commits(options: &Options, hash1: &str, hash2: &str) -> Result<Compar
     Ok(compare_diffs(&commit1.body, &commit2.body)?)
 }
 
+fn handle_empty_state(options: &Options, log: &mut Log) -> Result<bool, Box<dyn Error>> {
+    let git_dir = options.git_dir.clone().unwrap();
+    let session = Git::get_session(&git_dir)?;
+    let log_read = log.clone();
+    let next_hash = log_read.next_commit();
+
+    if session.unmerged_paths.is_empty() && session.modified_paths.is_empty() {
+        Git::cmd("cherry-pick --abort".to_string(), &git_dir)?;
+        log.commit_update(next_hash, "empty")?;
+        println!("{} {}", "Empty commit:".bright_blue(), next_hash.bright_blue());
+        return Ok(true);
+    }
+
+    Ok(false)
+}
+
 // Returns true if a patch was applied
 fn handle_git_state(options: &Options, log: &mut Log) -> Result<bool, Box<dyn Error>> {
     let git_dir = options.git_dir.clone().unwrap();
@@ -271,16 +287,21 @@ fn handle_git_state(options: &Options, log: &mut Log) -> Result<bool, Box<dyn Er
         let next_hash = log_read.next_commit();
 
         // Check for empty commit
-        if session.unmerged_paths.is_empty() && session.modified_paths.is_empty() {
-            Git::cmd("cherry-pick --abort".to_string(), &git_dir)?;
-            log.commit_update(next_hash, "empty")?;
-            println!("{} {}", "Empty commit:".bright_blue(), next_hash.bright_blue());
+        if handle_empty_state(&options, log)? {
             return Ok(true);
         }
 
         // If we have conflicts then edit them
         if !session.unmerged_paths.is_empty() {
             let handled = cmd_edit(options, log)?;
+
+            // After the edit is done we might have an empty commit
+            if !handled {
+                if handle_empty_state(&options, log)? {
+                    return Ok(true);
+                }
+            }
+
             return Ok(handled);
         }
 
