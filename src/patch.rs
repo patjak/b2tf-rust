@@ -25,11 +25,11 @@ impl PatchLine {
 
     pub fn print(&self) {
         if self.line_type == "+" {
-            println!("{} {}", self.line_type.green(), self.value.green());
+            println!("{}{}", self.line_type.green(), self.value.green());
         } else if self.line_type == "-" {
-            println!("{} {}", self.line_type.red(), self.value.red());
+            println!("{}{}", self.line_type.red(), self.value.red());
         } else {
-            println!("{} {}", self.line_type, self.value);
+            println!("{}{}", self.line_type, self.value);
         }
     }
 
