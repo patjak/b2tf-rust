@@ -83,6 +83,10 @@ impl Cli {
                     .about("rebase the commit list")
             )
             .subcommand(
+                Command::new("update")
+                    .about("update the commit log with hashes from git repo")
+            )
+            .subcommand(
                 Command::new("prepend")
                     .about("add commit hash to beginning of log")
                     .arg_required_else_help(true)

@@ -783,41 +783,61 @@ pub fn cmd_rebase(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>
         handle_git_state(options, log)?;
     }
 
-    // Rebase succeeded. Now rebuild the commit list
-    println!("");
+    // Rebase succeeded. Now update the commit list
+    cmd_update(&options, log)?;
+
+    println!("\nRebase done");
+
+    Ok(())
+}
+
+pub fn cmd_update(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
+    let git_dir = options.git_dir.clone().unwrap();
+    let branch_point = options.branch_point.clone().unwrap();
+    let session = Git::get_session(&git_dir)?;
+
+    if session.state != GitSessionState::None {
+        return Err("Invalid session state. Check your git repo.".into());
+    }
+
     let stdout = Git::cmd(format!("log --oneline --reverse --format='%H %s' {}..", branch_point), &git_dir)?;
     let lines: Vec<&str> = stdout.split("\n").collect();
     let commits = log.get_all()?;
 
+    println!("Updating {} commit hashes in log", commits.len());
+
     let mut j: usize = 0;
-    for i in 0..(commits.len() - 1) {
+    for i in 0..commits.len() {
 
         // Skip everything that is not a backported commit
         if commits[i].1.len() != 40 && !commits[i].1.is_empty(){
             continue;
         }
 
+        // Gather info about commit in log
         let commit = Git::show(&commits[i].0, &git_dir)?;
         let hash_log = commit.hash;
         let subject_log = commit.subject;
 
+        // Gather info about commit in repo
         let mut cols: Vec<&str> = lines[j].split(" ").collect();
         let hash_git = &cols.remove(0);
         let subject_git = cols.join(" ");
 
+        // Compare them
         if subject_git != subject_log {
             return Err(format!("Log is out of sync with git repository at:\nGit: {} {}\nLog: {} {}",
                                hash_git, subject_git, hash_log, subject_log).red().into());
         }
 
+        // Update entry in log
         j += 1;
         if commits[i].1 != *hash_git {
             print!("\rUpdating log: {}/{}", j, lines.len() - 1);
             log.commit_update(&hash_log, &hash_git)?;
         }
     }
-
-    println!("\nRebase done");
+    println!("\nUpdate completed");
 
     Ok(())
 }

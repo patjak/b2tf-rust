@@ -186,6 +186,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         cmd_diffstat(&options)?;
     } else if let Some(_matches) = matches.subcommand_matches("rebase") {
         cmd_rebase(&options, &mut log)?;
+    } else if let Some(_matches) = matches.subcommand_matches("update") {
+        cmd_update(&options, &mut log)?;
     } else if let Some(_matches) = matches.subcommand_matches("prepend") {
         cmd_prepend(&options, &mut log)?;
     } else if let Some(_matches) = matches.subcommand_matches("append") {
