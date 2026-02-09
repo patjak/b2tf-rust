@@ -131,15 +131,23 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
-    match log.load() {
+    let mut options = Options::new();
+
+    // Parse options from cli
+    options.parse_matches(&matches);
+    let w = options.work_dir.clone();
+    let work_dir = match w {
+        None => "./".to_string(),
+        Some(val) => val,
+    };
+
+    match log.load(&work_dir) {
         Err(_error) => {
             println!("{}", "\nFailed to open b2tf.log. Run setup to create it.".red());
             return Ok(());
         },
         _ => {},
     };
-
-    let mut options = Options::new();
 
     options.parse(&matches, &log)?;
 

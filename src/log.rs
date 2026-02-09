@@ -21,8 +21,9 @@ impl Log {
         }
     }
 
-    pub fn load(&mut self) -> Result<(), Box<dyn Error>>  {
-        let contents: String = fs::read_to_string(&self.filename)?.parse()?;
+    pub fn load(&mut self, work_dir: &String) -> Result<(), Box<dyn Error>>  {
+        let path = format!("{}/{}", work_dir, self.filename);
+        let contents: String = fs::read_to_string(&path)?.parse()?;
         let slices: Vec<&str> = contents.split("\n---\n").collect();
 
         self.config = String::from(slices[0]);
