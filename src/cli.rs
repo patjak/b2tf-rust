@@ -137,6 +137,10 @@ impl Cli {
                     .subcommand(
                         Command::new("apply")
                             .about("apply all patches to the SUSE tree")
+                            .arg(Arg::new("range guard")
+                                .help("automatically guard failing patches up to this revision")
+                                .long("range-guard")
+                            )
                     )
             )
     }

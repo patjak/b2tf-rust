@@ -20,6 +20,7 @@ use colored::Colorize;
 pub struct Options {
     pub range_start:    Option<String>,
     pub range_stop:     Option<String>,
+    pub range_guard:    Option<String>,
     pub branch:         Option<String>,
     pub branch_point:   Option<String>,
     pub work_dir:       Option<String>,
@@ -38,6 +39,7 @@ impl Options {
         Options {
             range_start: None,
             range_stop:  None,
+            range_guard: None,
             branch: None,
             branch_point: None,
             work_dir: None,
@@ -86,6 +88,14 @@ impl Options {
         if diffdiff_matches.is_some() {
             let skip = diffdiff_matches.unwrap().get_one::<String>("comma separated list of commits to skip").cloned();
             if skip.is_some() { self.skip = skip }
+        }
+
+        let suse_matches = matches.subcommand_matches("suse");
+        if suse_matches.is_some() {
+            let apply_matches = suse_matches.unwrap().subcommand_matches("apply");
+            let range_guard = apply_matches.unwrap().get_one::<String>("range guard").cloned();
+
+            if range_guard.is_some() { self.range_guard = range_guard }
         }
 
         if range_start.is_some() { self.range_start = range_start }
@@ -160,6 +170,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     if options.branch_point.is_none() {
         options.branch_point = options.range_start.clone();
+    }
+    if options.range_guard.is_none() {
+        options.range_guard = options.range_stop.clone();
     }
 
     Git::set_branch(&options.branch.clone().unwrap(),
