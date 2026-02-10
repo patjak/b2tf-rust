@@ -21,6 +21,7 @@ pub struct Options {
     pub range_start:    Option<String>,
     pub range_stop:     Option<String>,
     pub range_guard:    Option<String>,
+    pub guard_prefix:   Option<String>,
     pub branch:         Option<String>,
     pub branch_point:   Option<String>,
     pub work_dir:       Option<String>,
@@ -40,6 +41,7 @@ impl Options {
             range_start: None,
             range_stop:  None,
             range_guard: None,
+            guard_prefix: None,
             branch: None,
             branch_point: None,
             work_dir: None,
@@ -96,6 +98,9 @@ impl Options {
             if apply_matches.is_some() {
                 let range_guard = apply_matches.unwrap().get_one::<String>("range guard").cloned();
                 if range_guard.is_some() { self.range_guard = range_guard }
+
+                let guard_prefix = apply_matches.unwrap().get_one::<String>("guard prefix").cloned();
+                if guard_prefix.is_some() { self.guard_prefix = guard_prefix }
             }
         }
 
@@ -182,6 +187,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     if options.range_guard.is_none() {
         options.range_guard = options.range_stop.clone();
+    }
+    if options.guard_prefix.is_none() {
+        options.guard_prefix = Some("b2tf".to_string());
     }
 
     Git::set_branch(&options.branch.clone().unwrap(),

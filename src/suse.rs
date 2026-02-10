@@ -389,8 +389,10 @@ fn series_sort(kernel_source: &String) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn sequence_patch(range_guard_commits: &Vec<String>, kernel_source: &String, file_name: &String,
+fn sequence_patch(options: &Options, range_guard_commits: &Vec<String>, file_name: &String,
                   processed_commits: &mut Vec<Vec<String>>) -> Result<(), Box<dyn Error>> {
+    let kernel_source = options.kernel_source.clone().unwrap();
+
     'outer: loop {
         let output = Cmd::new("sh")
             .arg("-c")
@@ -423,7 +425,7 @@ fn sequence_patch(range_guard_commits: &Vec<String>, kernel_source: &String, fil
                     // println!("{}", "Automatically guarding patch since it will be applied later".yellow());
                     let file_name = failed_patch.split("/").collect::<Vec<&str>>().clone();
                     let file_name = file_name.last().unwrap();
-                    let needs_fix = insert_guard(file_name, kernel_source, processed_commits)?;
+                    let needs_fix = insert_guard(options, file_name, processed_commits)?;
                     if !needs_fix {
                         continue 'outer;
                     }
@@ -441,7 +443,7 @@ fn sequence_patch(range_guard_commits: &Vec<String>, kernel_source: &String, fil
             "g" => {
                 let file_name = failed_patch.split("/").collect::<Vec<&str>>().clone();
                 let file_name = file_name.last().unwrap();
-                insert_guard(file_name, kernel_source, processed_commits)?;
+                insert_guard(options, file_name, processed_commits)?;
             },
             "v" => {
                 Cmd::new("sh")
@@ -452,7 +454,7 @@ fn sequence_patch(range_guard_commits: &Vec<String>, kernel_source: &String, fil
                 continue;
             },
             "a" => {
-                series_remove(kernel_source, file_name)?;
+                series_remove(&kernel_source, file_name)?;
                 return Err("Aborted by user".red().into());
             },
             _ => (),
@@ -550,15 +552,17 @@ fn check_guard(file_name: &str, kernel_source: &String) -> Result<Option<String>
     Ok(None)
 }
 
-// Mark a patch with +b2tf in series.conf. Returns true if previously guarded
-fn insert_guard(file_name: &str, kernel_source: &String, processed_commits: &Vec<Vec<String>>) -> Result<bool, Box<dyn Error>> {
+// Mark a patch with +{guard_prefix} in series.conf. Returns true if previously guarded
+fn insert_guard(options: &Options, file_name: &str, processed_commits: &Vec<Vec<String>>) -> Result<bool, Box<dyn Error>> {
+    let kernel_source = options.kernel_source.clone().unwrap();
+    let guard_prefix = options.guard_prefix.clone().unwrap();
     let series_path = format!("{}/series.conf", kernel_source);
     let path = format!("patches.suse/{}", file_name.trim());
     let file = fs::read_to_string(&series_path)?;
     let lines: Vec<&str> = file.split("\n").collect();
 
     // Check series.conf if patch is already guarded
-    if check_guard(file_name, kernel_source)?.is_some() {
+    if check_guard(file_name, &kernel_source)?.is_some() {
         return Err("Patch is already guarded".red().into());
     }
 
@@ -579,8 +583,8 @@ fn insert_guard(file_name: &str, kernel_source: &String, processed_commits: &Vec
         let cols: Vec<&str> = l.split("\t").collect();
 
         if cols.len() == 1 && cols[0] == path {
-            println!("{} {}", "Adding guard +b2tf to".yellow(), path.yellow());
-            guard_str.push_str(format!("+b2tf\t{}\n", path).as_str());
+            println!("{} {}", "Guarding".yellow(), path.yellow());
+            guard_str.push_str(format!("+{}\t{}\n", guard_prefix, path).as_str());
             continue;
         }
         result_str.push_str(format!("{}\n", line).as_str());
@@ -600,24 +604,27 @@ fn insert_guard(file_name: &str, kernel_source: &String, processed_commits: &Vec
     Ok(false)
 }
 
-// Remove a patch marked with +b2tf in series.conf
-fn remove_guard(file_name: &str, kernel_source: &String) -> Result<(), Box<dyn Error>> {
+// Remove a patch marked with +{guard_prefix} in series.conf
+fn remove_guard(options: &Options, file_name: &str) -> Result<(), Box<dyn Error>> {
+    let kernel_source = options.kernel_source.clone().unwrap();
+    let guard_prefix = options.guard_prefix.clone().unwrap();
     let series_path = format!("{}/series.conf", kernel_source);
     let path = format!("patches.suse/{}", file_name);
     let file = fs::read_to_string(&series_path)?;
     let lines: Vec<&str> = file.split("\n").collect();
 
-    if !check_guard(file_name, kernel_source)?.is_some() {
+    if !check_guard(file_name, &kernel_source)?.is_some() {
         return Err("Patch is not guarded".red().into());
     }
 
     let mut result_str = String::new();
+    let guard_prefix = format!("+{}", guard_prefix);
 
     for line in lines {
         let l = line.trim();
         let cols: Vec<&str> = l.split("\t").collect();
 
-        if cols.len() == 2 && cols[0] == "+b2tf" && cols[1] == path {
+        if cols.len() == 2 && cols[0] == guard_prefix && cols[1] == path {
             continue;
         }
         result_str.push_str(format!("{}\n", line).as_str());
@@ -723,6 +730,7 @@ pub fn cmd_suse_apply(options: &Options) -> Result<(), Box<dyn Error>> {
     let git_dir = options.git_dir.clone().unwrap();
     let paths = options.paths.clone().unwrap();
     let range_start = options.range_start.clone().unwrap();
+    let guard_prefix = options.guard_prefix.clone().unwrap();
 
     // Create a list of all commits in the range_start..range_guard range
     let range_guard = options.range_guard.clone().unwrap();
@@ -784,9 +792,11 @@ pub fn cmd_suse_apply(options: &Options) -> Result<(), Box<dyn Error>> {
             let guard_file_name = suse_path.0.split("/").collect::<Vec<&str>>().clone();
             let guard_file_name = guard_file_name.last().unwrap();
             let guard = check_guard(guard_file_name, &kernel_source)?;
-            if guard.is_some() && guard.unwrap() == "+b2tf" {
+            let guard_prefix = format!("+{}",guard_prefix);
+
+            if guard.is_some() && guard.unwrap() == guard_prefix {
                 println!("{} {}", "Unguarding".yellow(), guard_file_name.yellow());
-                remove_guard(&guard_file_name, &kernel_source)?;
+                remove_guard(options, &guard_file_name)?;
                 series_insert(&kernel_source, &guard_file_name.to_string())?;
                 unguarding = true;
             }
@@ -801,7 +811,7 @@ pub fn cmd_suse_apply(options: &Options) -> Result<(), Box<dyn Error>> {
 
                 if unguarding {
                     println!("Patch is same or identical. Sequencing...");
-                    sequence_patch(&range_guard_commits, &kernel_source, &file_name.to_string(), &mut processed_commits)?;
+                    sequence_patch(options, &range_guard_commits, &file_name.to_string(), &mut processed_commits)?;
                     suse_log(&kernel_source, &suse_path.0)?;
                     handled = true;
                 } else {
@@ -818,7 +828,7 @@ pub fn cmd_suse_apply(options: &Options) -> Result<(), Box<dyn Error>> {
                 // Git-commit and Alt-commit might have changed places so update series.conf
                 series_sort(&kernel_source)?;
 
-                sequence_patch(&range_guard_commits, &kernel_source, &file_name.to_string(), &mut processed_commits)?;
+                sequence_patch(options, &range_guard_commits, &file_name.to_string(), &mut processed_commits)?;
                 suse_log(&kernel_source, &suse_path.0)?;
                 handled = true;
             }
@@ -832,7 +842,7 @@ pub fn cmd_suse_apply(options: &Options) -> Result<(), Box<dyn Error>> {
 
         copy_patch(&file_path, &dst_path, &kernel_source)?;
         series_insert(&kernel_source, &file_name.to_string())?;
-        sequence_patch(&kernel_source, &file_name.to_string(), &paths, &mut processed_commits)?;
+        sequence_patch(options, &range_guard_commits, &file_name.to_string(), &mut processed_commits)?;
         suse_log(&kernel_source, "")?;
     }
 

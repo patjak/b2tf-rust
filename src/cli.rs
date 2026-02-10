@@ -141,6 +141,10 @@ impl Cli {
                                 .help("automatically guard failing patches up to this revision")
                                 .long("range-guard")
                             )
+                            .arg(Arg::new("guard prefix")
+                                .help("Prefix to use when guarding patches")
+                                .long("guard-prefix")
+                            )
                     )
             )
     }
