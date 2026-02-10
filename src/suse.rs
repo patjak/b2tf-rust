@@ -2,7 +2,6 @@ use std::process::Command as Cmd;
 use std::error::Error;
 use std::{fs, io};
 use std::path;
-use std::path::*;
 use crate::Options;
 use crate::Log;
 use crate::git::Git;
@@ -390,7 +389,8 @@ fn series_sort(kernel_source: &String) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn sequence_patch(kernel_source: &String, file_name: &String, paths: &Vec<PathBuf>, processed_commits: &mut Vec<Vec<String>>) -> Result<(), Box<dyn Error>> {
+fn sequence_patch(range_guard_commits: &Vec<String>, kernel_source: &String, file_name: &String,
+                  processed_commits: &mut Vec<Vec<String>>) -> Result<(), Box<dyn Error>> {
     'outer: loop {
         let output = Cmd::new("sh")
             .arg("-c")
@@ -404,6 +404,7 @@ fn sequence_patch(kernel_source: &String, file_name: &String, paths: &Vec<PathBu
             break;
         }
 
+        // Parse which patch failed to apply
         let hunk: Vec<&str> = stderr.split("Patch ").collect();
         let lines: Vec<&str> = hunk[1].split("\n").collect();
         let cols: Vec<&str> = lines[0].split(" ").collect();
@@ -412,24 +413,24 @@ fn sequence_patch(kernel_source: &String, file_name: &String, paths: &Vec<PathBu
         println!("{} {}", "Sequence failed with patch:".red(), failed_patch.red());
 
         // If sequencing fails we check if the failed patch is going to be applied
-        // by us later. And if so, we automatically guard it.
+        // by us later (in range_start..range_guard). And if so, we automatically guard it.
         let failed_hashes = get_git_commits_from_patch(&format!("{}/{}", &kernel_source, &failed_patch))?;
-        'inner: for path in paths {
-            let hashes = get_git_commits_from_patch(&path.display().to_string())?;
-
-            if compare_commits(&hashes, &failed_hashes) {
-                 for p in &mut *processed_commits {
-                    if compare_commits(&hashes, &p) {
-                        // We've already processed this patch so don't try to guard it
-                        // automatically
-                        break 'inner;
+        if compare_commits(range_guard_commits, &failed_hashes) {
+            println!("This patch is within the guard range");
+            for p in &*processed_commits {
+                // Don't automatically guard if we have already processed this patch
+                if !compare_commits(&failed_hashes, &p) {
+                    // println!("{}", "Automatically guarding patch since it will be applied later".yellow());
+                    let file_name = failed_patch.split("/").collect::<Vec<&str>>().clone();
+                    let file_name = file_name.last().unwrap();
+                    let needs_fix = insert_guard(file_name, kernel_source, processed_commits)?;
+                    if !needs_fix {
+                        continue 'outer;
                     }
+                    break;
+                } else {
+                    println!("Patch has already been processed. Cannot guard again!");
                 }
-                println!("{}", "Automatically guarding patch since it will be applied later".yellow());
-                let file_name = failed_patch.split("/").collect::<Vec<&str>>().clone();
-                let file_name = file_name.last().unwrap();
-                insert_guard(file_name, kernel_source, processed_commits)?;
-                continue 'outer;
             }
         }
 
@@ -529,6 +530,7 @@ fn suse_log(kernel_source: &String, msg: &str) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+// Check if patch is guarded or not. Returns the guard prefix as a String
 fn check_guard(file_name: &str, kernel_source: &String) -> Result<Option<String>, Box<dyn Error>> {
     let series_path = format!("{}/series.conf", kernel_source);
     let path = format!("patches.suse/{}", file_name);
@@ -548,10 +550,10 @@ fn check_guard(file_name: &str, kernel_source: &String) -> Result<Option<String>
     Ok(None)
 }
 
-// Mark a patch with +b2tf in series.conf
-fn insert_guard(file_name: &str, kernel_source: &String, processed_commits: &mut Vec<Vec<String>>) -> Result<(), Box<dyn Error>> {
+// Mark a patch with +b2tf in series.conf. Returns true if previously guarded
+fn insert_guard(file_name: &str, kernel_source: &String, processed_commits: &Vec<Vec<String>>) -> Result<bool, Box<dyn Error>> {
     let series_path = format!("{}/series.conf", kernel_source);
-    let path = format!("patches.suse/{}", file_name);
+    let path = format!("patches.suse/{}", file_name.trim());
     let file = fs::read_to_string(&series_path)?;
     let lines: Vec<&str> = file.split("\n").collect();
 
@@ -562,10 +564,10 @@ fn insert_guard(file_name: &str, kernel_source: &String, processed_commits: &mut
 
     // Make sure we're not guarding an already processed commit
     let hashes = get_git_commits_from_patch(&format!("{}/{}", kernel_source, path))?;
-    for g in &mut *processed_commits {
+    for g in &*processed_commits {
         if compare_commits(&hashes, &g) {
             println!("{}", "Patch has already been processed and cannot be guarded. Patch must be fixed instead.".red());
-            return Ok(());
+            return Ok(true);
         }
     }
 
@@ -595,7 +597,7 @@ fn insert_guard(file_name: &str, kernel_source: &String, processed_commits: &mut
 
     fs::write(&series_path, result_str)?;
 
-    Ok(())
+    Ok(false)
 }
 
 // Remove a patch marked with +b2tf in series.conf
@@ -712,6 +714,20 @@ fn replace_patch(file_path: &String, suse_path: &String, kernel_source: &String,
 pub fn cmd_suse_apply(options: &Options) -> Result<(), Box<dyn Error>> {
     let work_dir = options.work_dir.clone().unwrap();
     let kernel_source = options.kernel_source.clone().unwrap();
+    let git_dir = options.git_dir.clone().unwrap();
+    let paths = options.paths.clone().unwrap();
+    let range_start = options.range_start.clone().unwrap();
+
+    // Create a list of all commits in the range_start..range_guard range
+    let range_guard = options.range_guard.clone().unwrap();
+    let query = format!("log --format='%H' {range_start}..{range_guard} -- {paths}").to_string();
+    let commits = Git::cmd(query, &git_dir)?;
+    let commits: Vec<&str> = commits.split("\n").collect();
+
+    let mut range_guard_commits: Vec<String> = Vec::new();
+    for c in commits {
+        range_guard_commits.push(c.to_string());
+    }
 
     println!("Applying patches to SUSE kernel-source...\n");
 
@@ -779,7 +795,7 @@ pub fn cmd_suse_apply(options: &Options) -> Result<(), Box<dyn Error>> {
 
                 if unguarding {
                     println!("Patch is same or identical. Sequencing...");
-                    sequence_patch(&kernel_source, &file_name.to_string(), &paths, &mut processed_commits)?;
+                    sequence_patch(&range_guard_commits, &kernel_source, &file_name.to_string(), &mut processed_commits)?;
                     suse_log(&kernel_source, &suse_path.0)?;
                     handled = true;
                 } else {
@@ -796,7 +812,7 @@ pub fn cmd_suse_apply(options: &Options) -> Result<(), Box<dyn Error>> {
                 // Git-commit and Alt-commit might have changed places so update series.conf
                 series_sort(&kernel_source)?;
 
-                sequence_patch(&kernel_source, &file_name.to_string(), &paths, &mut processed_commits)?;
+                sequence_patch(&range_guard_commits, &kernel_source, &file_name.to_string(), &mut processed_commits)?;
                 suse_log(&kernel_source, &suse_path.0)?;
                 handled = true;
             }

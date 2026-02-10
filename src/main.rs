@@ -93,9 +93,10 @@ impl Options {
         let suse_matches = matches.subcommand_matches("suse");
         if suse_matches.is_some() {
             let apply_matches = suse_matches.unwrap().subcommand_matches("apply");
-            let range_guard = apply_matches.unwrap().get_one::<String>("range guard").cloned();
-
-            if range_guard.is_some() { self.range_guard = range_guard }
+            if apply_matches.is_some() {
+                let range_guard = apply_matches.unwrap().get_one::<String>("range guard").cloned();
+                if range_guard.is_some() { self.range_guard = range_guard }
+            }
         }
 
         if range_start.is_some() { self.range_start = range_start }
