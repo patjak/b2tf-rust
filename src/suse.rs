@@ -623,6 +623,12 @@ fn remove_guard(file_name: &str, kernel_source: &String) -> Result<(), Box<dyn E
         result_str.push_str(format!("{}\n", line).as_str());
     }
 
+    // Remove last newline if needed
+    let last_char = result_str.pop().unwrap();
+    if last_char != '\n' {
+        result_str.push(last_char);
+    }
+
     fs::write(&series_path, result_str)?;
 
     Ok(())
