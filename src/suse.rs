@@ -504,30 +504,90 @@ fn series_remove(kernel_source: &String, file_name: &String) -> Result<(), Box<d
     Ok(())
 }
 
-fn suse_log(kernel_source: &String, msg: &str) -> Result<(), Box<dyn Error>> {
-    // If only series.conf is modified we are unguarding and scripts/log doesn't work
+fn suse_log_entry(options: &Options, entry: (String, String), actions: &mut Vec<String>) -> Result<(), Box<dyn Error>> {
+    let kernel_source = options.kernel_source.clone().unwrap();
+
+    // Don't create an entry for series.conf
+    if entry.1 == "series.conf" {
+        return Ok(());
+    }
+
+    let subject = get_suse_tags(&entry.1, &kernel_source, "Subject")?;
+    if subject.len() == 0 {
+        return Err("Invalid len()".into());
+    }
+    let subject = subject[0].clone();
+    let path_type = entry.0;
+    let path = format!("{}/{}", kernel_source, entry.1);
+    let references = get_suse_tags(&path, &kernel_source, "References")?[0].clone();
+
+    match path_type.as_str() {
+        "new file" => {
+            actions.push(format!("{} ({})", subject, references));
+        },
+        "modified" => {
+            // Check if the references tag has changed
+            let diff = Git::cmd(format!("diff {}", path), &kernel_source)?;
+            let refs: Vec<&str> = diff.split("+References:").collect();
+            let prefix: String;
+            if refs.len() == 1 {
+                prefix = "Refresh".to_string();
+            } else if refs.len() == 2 {
+                prefix = "Update".to_string();
+            } else {
+                return Err(format!("Failed to parse diff of {}", path).into());
+            }
+            let text = format!("{} {}", prefix, entry.1);
+            actions.push(text);
+        },
+        "deleted" => {
+            actions.push(format!("Delete {}", path));
+        }
+        &_ => {
+            return Err(format!("Failed to interpret modified path: {}", path_type).into());
+        },
+    }
+
+    Ok(())
+}
+
+fn suse_log(options: &Options, msg: &str) -> Result<(), Box<dyn Error>> {
+    let kernel_source = options.kernel_source.clone().unwrap();
     let session = Git::get_session(&kernel_source)?;
+
+    // If only series.conf is modified we are unguarding and scripts/log doesn't work
     if session.unmerged_paths.len() == 0 &&
        session.unstaged_paths.len() == 0 &&
        session.modified_paths.len() == 1 &&
        session.modified_paths[0].1 == "series.conf" {
         Git::cmd("add series.conf".to_string(), &kernel_source)?;
-        Git::cmd(format!("commit -m 'Remove guard from {}'", msg), &kernel_source)?;
+        Git::cmd(format!("commit --no-verify -m 'Remove guard from {}'", msg), &kernel_source)?;
         println!("Commited unguarding");
+        return Ok(());
     }
 
-    let output = Cmd::new("sh")
-            .arg("-c")
-            .arg(format!("cd {} && scripts/log --no-edit", kernel_source))
-            .output()
-            .expect("Failed to run scripts/log");
+    let mut actions: Vec<String> = Vec::new();
 
-    if !output.status.success() {
-        let stderr = String::from_utf8(output.stderr).expect("Invalid UTF8");
-
-        println!("{}", stderr);
-        return Err("Failed to run scripts/log".red().into());
+    for entry in session.modified_paths {
+        suse_log_entry(options, entry, &mut actions)?;
     }
+
+    for entry in session.unstaged_paths {
+        suse_log_entry(options, entry, &mut actions)?;
+    }
+
+    let mut output = String::new();
+    if actions.len() == 1 {
+            output.push_str(format!("{}", actions[0]).as_str());
+    } else {
+        for a in actions {
+            output.push_str(format!("- {}\n", a).as_str());
+        }
+    }
+
+    fs::write("/tmp/b2tf-commit-msg", output)?;
+    Git::cmd(format!("commit -a --no-verify -F /tmp/b2tf-commit-msg"), &kernel_source)?;
+    fs::remove_file("/tmp/b2tf-commit-msg")?;
 
     Ok(())
 }
@@ -812,7 +872,7 @@ pub fn cmd_suse_apply(options: &Options) -> Result<(), Box<dyn Error>> {
                 if unguarding {
                     println!("Patch is same or identical. Sequencing...");
                     sequence_patch(options, &range_guard_commits, &file_name.to_string(), &mut processed_commits)?;
-                    suse_log(&kernel_source, &suse_path.0)?;
+                    suse_log(&options, &suse_path.0)?;
                     handled = true;
                 } else {
                     println!("Patch is same or identical. Skipping.");
@@ -829,7 +889,7 @@ pub fn cmd_suse_apply(options: &Options) -> Result<(), Box<dyn Error>> {
                 series_sort(&kernel_source)?;
 
                 sequence_patch(options, &range_guard_commits, &file_name.to_string(), &mut processed_commits)?;
-                suse_log(&kernel_source, &suse_path.0)?;
+                suse_log(&options, &suse_path.0)?;
                 handled = true;
             }
         }
@@ -843,7 +903,7 @@ pub fn cmd_suse_apply(options: &Options) -> Result<(), Box<dyn Error>> {
         copy_patch(&file_path, &dst_path, &kernel_source)?;
         series_insert(&kernel_source, &file_name.to_string())?;
         sequence_patch(options, &range_guard_commits, &file_name.to_string(), &mut processed_commits)?;
-        suse_log(&kernel_source, "")?;
+        suse_log(&options, "")?;
     }
 
     println!("\nDone");
