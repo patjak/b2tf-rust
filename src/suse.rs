@@ -210,7 +210,7 @@ pub fn cmd_suse_unblacklist(options: &Options) -> Result<(), Box<dyn Error>> {
 fn get_suse_tags(file_path: &String, kernel_source: &String, tag: &str) -> Result <Vec<String>, Box<dyn Error>> {
     let output = Cmd::new("sh")
         .arg("-c")
-        .arg(format!("{}/scripts/patch-tag --print {} {}", kernel_source, tag, file_path))
+        .arg(format!("cd {} && {}/scripts/patch-tag --print {} {}", kernel_source, kernel_source, tag, file_path))
         .output()
         .expect("Failed to get tag");
 
