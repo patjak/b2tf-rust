@@ -419,7 +419,6 @@ fn sequence_patch(options: &Options, range_guard_commits: &Vec<String>, file_nam
         // by us later (in range_start..range_guard). And if so, we automatically guard it.
         let failed_hashes = get_git_commits_from_patch(&format!("{}/{}", &kernel_source, &failed_patch))?;
         if compare_commits(range_guard_commits, &failed_hashes) {
-            println!("This patch is within the guard range");
             for p in &*processed_commits {
                 // Don't automatically guard if we have already processed this patch
                 if !compare_commits(&failed_hashes, &p) {
@@ -876,7 +875,7 @@ pub fn cmd_suse_apply(options: &Options) -> Result<(), Box<dyn Error>> {
                     suse_log(&options, &suse_path.0)?;
                     handled = true;
                 } else {
-                    println!("Patch is same or identical. Skipping.");
+                    println!("Patch is {:?}. Skipping.", comp_res);
                     handled = true;
                 }
                 break;
