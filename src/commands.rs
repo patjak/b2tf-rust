@@ -8,7 +8,7 @@ use colored::Colorize;
 use crate::Options;
 use crate::Log;
 use crate::Util;
-use crate::patch::Patch;
+use crate::patch::{CompareResult, Patch};
 use crate::git::{Git, GitSessionState};
 use unidiff::{PatchSet, PatchedFile, Hunk};
 use mktemp::Temp;
@@ -155,110 +155,51 @@ fn get_commit_cache(options: &Options) -> Result<Vec<(String, String)>, Box<dyn 
     Ok(cache)
 }
 
-/* Describes how well two patches match eachother
- *
- * Different    - no match at all
- * Similar      - the changes are the same but with different line numbers
- * Same         - changes and line number are the same but patch files are not identical
- * Identical    - the patches contain exactly the same contents
- */
-#[derive(PartialEq, PartialOrd)]
-pub enum CompareResult {
-    Different = 0,
-    Similar = 1,
-    Same = 2,
-    Identical = 3,
-}
-
-fn compare_diffs(diff1: &String, diff2: &String) -> Result<CompareResult, Box<dyn Error>> {
-
-    // Compare strings directly
-    if diff1 == diff2 {
-        return Ok(CompareResult::Identical);
-    }
-
-    let mut patch1 = PatchSet::new();
-    patch1.parse(diff1).expect("Error parsing diff");
-
-    let mut patch2 = PatchSet::new();
-    patch2.parse(diff2).expect("Error parsing diff");
-
-    if patch1.len() != patch2.len() {
-        return Ok(CompareResult::Different);
-    }
-
-    let files1 = patch1.files();
-    let files2 = patch2.files();
-
-    // Stores whether line numbers are not matching
-    let mut context_mismatch = false;
-
-    for i in 0..(files1.len() - 1) {
-        let file1 = &files1[i];
-        let file2 = &files2[i];
-
-        if file1.len() != file2.len() {
-            return Ok(CompareResult::Different);
-        }
-
-        let hunks1 = file1.hunks();
-        let hunks2 = file2.hunks();
-
-        if hunks1.len() != hunks2.len() {
-            return Ok(CompareResult::Different);
-        }
-
-        for j in 0..(hunks1.len() - 1) {
-            if hunks1[j].section_header != hunks2[j].section_header {
-                return Ok(CompareResult::Different);
-            }
-
-            let lines1 = hunks1[j].lines();
-            let lines2 = hunks2[j].lines();
-
-            if lines1.len() != lines2.len() {
-                return Ok(CompareResult::Different);
-            }
-
-            for k in 0..lines1.len() {
-                let line1 = &lines1[k];
-                let line2 = &lines2[k];
-
-                if line1.source_line_no != line2.source_line_no ||
-                   line1.target_line_no != line2.target_line_no ||
-                   line1.diff_line_no != line2.diff_line_no {
-                       context_mismatch = true;
-                }
-
-                if line1.line_type != line2.line_type ||
-                   line1.value != line2.value {
-                       return Ok(CompareResult::Different);
-                }
-            }
-        }
-    }
-
-    if context_mismatch {
-        return Ok(CompareResult::Similar);
-    }
-
-    Ok(CompareResult::Same)
-}
-
 pub fn compare_patches(src_path: &str, dst_path: &str) -> Result<CompareResult, Box<dyn Error>> {
     let src: String = fs::read_to_string(src_path)?;
     let dst: String = fs::read_to_string(dst_path)?;
 
-    Ok(compare_diffs(&src, &dst)?)
+    if src == dst {
+        return Ok(CompareResult::Identical);
+    }
+
+    let mut patch1 = Patch::new();
+    let mut patch2 = Patch::new();
+
+    patch1.parse(&src.to_string());
+    patch2.parse(&dst.to_string());
+
+    Ok(patch1.compare(patch2))
 }
 
 fn compare_commits(options: &Options, hash1: &str, hash2: &str) -> Result<CompareResult, Box<dyn Error>> {
     let git_dir = options.git_dir.clone().unwrap();
 
-    let commit1 = Git::show(hash1, &git_dir)?;
-    let commit2 = Git::show(hash2, &git_dir)?;
+    let commit1 = Git::show(hash1, &git_dir.to_string())?;
+    let commit2 = Git::show(hash2, &git_dir.to_string())?;
 
-    Ok(compare_diffs(&commit1.body, &commit2.body)?)
+    let mut patch1 = Patch::new();
+    let mut patch2 = Patch::new();
+
+    patch1.parse(&commit1.body);
+    patch2.parse(&commit2.body);
+
+    let res = patch1.compare(patch2);
+
+    Ok(res)
+}
+
+pub fn cmd_compare(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
+    let p1 = options.patch1.clone().unwrap();
+    let p1 = p1.as_str();
+    let p2 = options.patch2.clone().unwrap();
+    let p2 = p2.as_str();
+
+    let ret = compare_patches(p1, p2)?;
+
+    println!("Result: {:?}", ret);
+
+    Ok(())
 }
 
 fn handle_empty_state(options: &Options, log: &mut Log) -> Result<bool, Box<dyn Error>> {

@@ -2,6 +2,21 @@ extern crate unidiff;
 use colored::Colorize;
 use unidiff::{PatchSet, PatchedFile, Hunk, Line};
 
+/* Describes how well two patches match eachother
+ *
+ * Different    - no match at all
+ * Similar      - the changes are the same but with different line numbers
+ * Same         - changes and line number are the same but patch files are not identical
+ * Identical    - the patches contain exactly the same contents
+ */
+#[derive(PartialEq, PartialOrd, Debug)]
+pub enum CompareResult {
+    Different = 0,
+    Similar = 1,
+    Same = 2,
+    Identical = 3,
+}
+
 #[derive(Clone)]
 #[derive(Debug)]
 pub struct PatchLine {
@@ -102,8 +117,17 @@ impl PatchHunk {
     }
 
     pub fn compare(&self, hunk: &PatchHunk, fuzz: bool) -> bool {
-        if self.section_header != hunk.section_header {
-            return false;
+        // Sometimes section headers are trunkated so we must handle that when comparing
+        let h1 = String::from(self.section_header.clone());
+        let h2 = String::from(hunk.section_header.clone());
+        if h1.len() > h2.len() {
+            if !h1.starts_with(&h2) {
+                return false;
+            }
+        } else {
+            if !h2.starts_with(&h1) {
+                return false;
+            }
         }
 
         if !fuzz {
@@ -116,6 +140,11 @@ impl PatchHunk {
         }
 
         if self.lines.len() != hunk.lines.len() {
+            for i in 0..self.lines.len() {
+                if i >= self.lines.len() || i >= hunk.lines.len() {
+                    break;
+                }
+            }
             return false;
         }
 
@@ -129,7 +158,6 @@ impl PatchHunk {
         }
         true
     }
-
 }
 
 #[derive(Clone)]
@@ -249,5 +277,29 @@ impl Patch {
                 }
             }
         }
+    }
+
+    pub fn compare(&self, patch: Patch) -> CompareResult {
+        if self.files.len() != patch.files.len() {
+            return CompareResult::Different;
+        }
+
+        let mut similar = false;
+
+        for i in 0..self.files.len() {
+            let file = &self.files[i];
+            if !file.compare(&patch.files[i], false) {
+                if !file.compare(&patch.files[i], true) {
+                    return CompareResult::Different;
+                } else {
+                    similar = true;
+                }
+            }
+        }
+        if similar {
+            return CompareResult::Similar;
+        }
+
+        CompareResult::Same
     }
 }

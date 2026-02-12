@@ -7,6 +7,7 @@ use crate::Log;
 use crate::git::Git;
 use crate::Util;
 use crate::commands::*;
+use crate::patch::CompareResult;
 use clap::{ArgMatches, Command};
 use colored::Colorize;
 
