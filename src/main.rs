@@ -33,6 +33,8 @@ pub struct Options {
     pub hash:           Option<String>,
     pub after:          Option<String>,
     pub skip:           Option<String>,
+    pub patch1:         Option<String>,
+    pub patch2:         Option<String>,
 }
 
 impl Options {
@@ -53,6 +55,8 @@ impl Options {
             hash: None,
             after: None,
             skip: None,
+            patch1: None,
+            patch2: None,
         }
     }
 
@@ -90,6 +94,15 @@ impl Options {
         if diffdiff_matches.is_some() {
             let skip = diffdiff_matches.unwrap().get_one::<String>("comma separated list of commits to skip").cloned();
             if skip.is_some() { self.skip = skip }
+        }
+
+        let compare_matches = matches.subcommand_matches("compare");
+        if compare_matches.is_some() {
+            let patch1 = compare_matches.unwrap().get_one::<String>("patch 1").cloned();
+            let patch2 = compare_matches.unwrap().get_one::<String>("patch 2").cloned();
+
+            if patch1.is_some() { self.patch1 = patch1 }
+            if patch2.is_some() { self.patch2 = patch2 }
         }
 
         let suse_matches = matches.subcommand_matches("suse");
@@ -224,6 +237,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         cmd_append(&options, &mut log)?;
     } else if let Some(_matches) = matches.subcommand_matches("insert") {
         cmd_insert(&options, &mut log)?;
+    } else if let Some(_matches) = matches.subcommand_matches("compare") {
+        cmd_compare(&options, &mut log)?;
     } else if let Some(suse_matches) = matches.subcommand_matches("suse") {
         let subcommand = command.find_subcommand_mut("suse").unwrap();
         cmd_suse(&mut options, &log, subcommand, suse_matches)?;
