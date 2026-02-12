@@ -863,7 +863,7 @@ pub fn cmd_suse_apply(options: &Options) -> Result<(), Box<dyn Error>> {
 
             let comp_res = compare_patches(&file_path, &suse_path.0)?;
 
-            if comp_res == CompareResult::Identical || comp_res == CompareResult::Same {
+            if comp_res == CompareResult::Identical || comp_res == CompareResult::Same || comp_res == CompareResult::Similar {
                 let query = format!("ls-files --error-unmatch {} > /dev/null", suse_path.0);
                 if !Git::cmd_passthru(query, &kernel_source)? {
                     return Err("Patch was applied but not committed. Fix the state of the kernel-source before continuing".red().into());
