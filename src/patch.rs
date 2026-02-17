@@ -120,13 +120,18 @@ impl PatchHunk {
         // Sometimes section headers are trunkated so we must handle that when comparing
         let h1 = String::from(self.section_header.clone());
         let h2 = String::from(hunk.section_header.clone());
-        if h1.len() > h2.len() {
-            if !h1.starts_with(&h2) {
-                return false;
-            }
-        } else {
-            if !h2.starts_with(&h1) {
-                return false;
+
+        // The header context doesn't have to match for patch to figure out how to insert the hunk
+        // so treat this as "Similar" and not "Different"
+        if !fuzz {
+            if h1.len() > h2.len() {
+                if !h1.starts_with(&h2) {
+                    return false;
+                }
+            } else {
+                if !h2.starts_with(&h1) {
+                    return false;
+                }
             }
         }
 
