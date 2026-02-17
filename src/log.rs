@@ -61,6 +61,9 @@ impl Log {
             } else if name == "range-stop" {
                 options.range_stop = Some(value.to_string());
 
+            } else if name == "range-guard" {
+                options.range_guard = Some(value.to_string());
+
             } else if name == "branch" {
                 options.branch = Some(value.to_string());
 
@@ -84,6 +87,10 @@ impl Log {
 
             } else if name == "suse-kernel-source" {
                 options.kernel_source = Some(value.to_string());
+
+            } else if name == "guard-prefix" {
+                options.guard_prefix = Some(value.to_string());
+
             }
         };
 
