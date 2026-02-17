@@ -637,7 +637,7 @@ pub fn cmd_diffdiff(options: &Options) -> Result<(), Box<dyn Error>> {
     let mut patch_stop = Patch::new();
     patch_stop.parse(&diff_stop);
 
-    patch_stop.subtract(patch_start, false);
+    patch_stop.subtract(patch_start, true);
 
     for s in skip_hashes {
         if s.is_empty() {

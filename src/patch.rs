@@ -255,32 +255,60 @@ impl Patch {
     }
 
     pub fn subtract(&mut self, patch: Patch, fuzz: bool) {
-        // Make sure we don't overflow the subtractions below
-        if patch.files.len() == 0 || self.files.len() == 0 {
-            return;
-        }
+        // Iterate over subtrahend files
+        let mut i = 0;
+        let i_len = patch.files.len();
 
-        for i in 0..(patch.files.len() - 1) {
-            for j in 0..(self.files.len() - 1){
-                let file_a = self.files[j].clone();
-                let file_b = &patch.files[i];
+        while i < i_len {
+            let file_a = patch.files[i].clone();
 
-                if file_a.compare(&file_b, fuzz) {
-                    self.files.remove(j);
+            // Iterate over minuend files
+            let mut j = 0;
+            let mut j_len = self.files.len();
+
+            while j < j_len {
+                let file_b = self.files[j].clone();
+
+                if file_a.source_file != file_b.source_file ||
+                   file_a.target_file != file_b.target_file {
+                    j += 1;
                     continue;
                 }
 
-                for k in 0..patch.files[i].hunks.len() {
-                    for l in 0..self.files[j].hunks.len() {
-                        let hunk_a = &file_a.hunks[l];
-                        let hunk_b = &file_b.hunks[k];
+                // Remove entire file if "Similar"
+                if file_a.compare(&file_b, fuzz) {
+                    self.files.remove(j);
+                    j_len -= 1;
+                    continue;
+                }
+
+                // Iterate over subtrahend hunks
+                let mut k = 0;
+                let k_len = patch.files[i].hunks.len();
+
+                while k < k_len {
+                    let hunk_a = &file_a.hunks[k];
+
+                    // Iterate over minuend hunks
+                    let mut l = 0;
+                    let mut l_len = self.files[j].hunks.len();
+
+                    while l < l_len {
+                        let hunk_b = &file_b.hunks[l];
 
                         if hunk_a.compare(hunk_b, fuzz) {
                             self.files[j].hunks.remove(l);
+                            l_len -= 1;
+                            continue;
                         }
+
+                        l += 1;
                     }
+                    k += 1;
                 }
+                j += 1;
             }
+            i += 1;
         }
     }
 
