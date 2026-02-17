@@ -12,6 +12,7 @@ use crate::util::*;
 use crate::suse::cmd_suse;
 use crate::git::*;
 use clap::ArgMatches;
+use std::env;
 use std::fmt::Debug;
 use std::error::Error;
 use colored::Colorize;
@@ -156,7 +157,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     options.parse_matches(&matches);
     let w = options.work_dir.clone();
     let work_dir = match w {
-        None => "./".to_string(),
+        None => {
+            let path = env::current_dir()?.display().to_string();
+            options.work_dir = Some(path.clone());
+            path
+        },
         Some(val) => val,
     };
 
