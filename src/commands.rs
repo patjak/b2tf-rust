@@ -103,7 +103,7 @@ fn get_cherrypick_cache(options: &Options) -> Result<Vec<(String, String)>, Box<
     let start_date = Git::cmd(query, &git_dir)?;
     let start_date = start_date.trim();
 
-    let query = format!("log --no-merges --since \"$(date --date \"{start_date} - 6 months\")\" --format='%H' --grep=\"(cherry picked from commit \" -- {paths}").to_string();
+    let query = format!("log --no-merges --since \"$(date --date \"{start_date} - 6 months\")\" --format='%H' --grep=\"(cherry picked from commit \" {range_start} -- {paths}").to_string();
     let stdout = Git::cmd(query, &git_dir)?;
 
     let lines: Vec<&str> = stdout.split("\n").collect();
