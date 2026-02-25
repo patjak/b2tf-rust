@@ -797,6 +797,9 @@ pub fn cmd_prepend(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error
 
     let hashes: Vec<&str> = hash_arg.split(" ").collect();
     for hash in hashes {
+        if hash.trim().is_empty() {
+            continue;
+        }
         let commit = Git::show(hash, &git_dir)?;
         prepend.push_str(format!("# {}\n{}\n\n", commit.subject, commit.hash).as_str());
     }
@@ -824,6 +827,9 @@ pub fn cmd_append(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>
 
     let hashes: Vec<&str> = hash_arg.split(" ").collect();
     for hash in hashes {
+        if hash.trim().is_empty() {
+            continue;
+        }
         let commit = Git::show(hash, &git_dir)?;
         append.push_str(format!("# {}\n{}\n\n", commit.subject, commit.hash).as_str());
     }
@@ -860,6 +866,9 @@ pub fn cmd_insert(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>
 
     let hashes: Vec<&str> = hash_arg.split(" ").collect();
     for hash in hashes {
+        if hash.trim().is_empty() {
+            continue;
+        }
         let commit = Git::show(hash, &git_dir)?;
         insert.push_str(format!("# {}\n{}\n\n", commit.subject, commit.hash).as_str());
     }
