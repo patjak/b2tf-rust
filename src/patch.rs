@@ -306,6 +306,14 @@ impl Patch {
                     }
                     k += 1;
                 }
+
+                // Remove file if empty
+                if self.files[j].hunks.is_empty() {
+                    self.files.remove(j);
+                    j_len -= 1;
+                    continue;
+                }
+
                 j += 1;
             }
             i += 1;
