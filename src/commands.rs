@@ -423,17 +423,25 @@ pub fn cmd_edit(options: &Options, log: &mut Log) -> Result<bool, Box<dyn Error>
         let target_file = format!("/tmp/{}-{}", range_stop, file_path.file_name().unwrap().to_str().unwrap());
 
         loop {
-            let ask = Util::ask(format!("Edit {} (Y)es/(n)o)/(s)kip commit/(a)bort? ", file.bold()), vec!["y", "n", "s", "a"], "y");
+            let ask = Util::ask(format!("Edit {} (Y)es/(n)o)/(v)iew commit/(s)kip commit/(a)bort? ", file.bold()), vec!["y", "n", "v", "s", "a"], "y");
             let val = ask.as_str();
 
             match val {
                 "n" => break,
                 "a" => return Err("Aborted by user".red().into()),
+                "v" => {
+                    let status = Command::new("sh")
+                        .arg("-c")
+                        .arg(format!("git -C {} show {}", git_dir, commit))
+                        .status()
+                        .expect("Failed to view commit");
+                    continue
+                },
                 "s" => {
                     cmd_skip(options, log)?;
                     return Ok(true);
                 },
-                _ => val,
+                _ => (),
             };
 
             // Find the line number where to start editing
