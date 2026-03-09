@@ -368,21 +368,21 @@ fn print_session(git_dir: &String) -> Result<(), Box<dyn Error>> {
     if !session.modified_paths.is_empty() {
         println!("\nChanges to be committed:");
         for path in session.modified_paths.iter() {
-            println!("\t{}", path.1.green());
+            println!("\t{}: {}", path.0, path.1.green());
         }
     }
 
     if !session.unmerged_paths.is_empty() {
         println!("\nUnmerged paths:");
         for path in session.unmerged_paths.iter() {
-            println!("\t{}", path.1.red());
+            println!("\t{}: {}", path.0, path.1.red());
         }
     }
 
     if !session.unstaged_paths.is_empty() {
         println!("\nChanges not staged for commit:");
         for path in session.unstaged_paths.iter() {
-            println!("\t{}", path.1.red());
+            println!("\t{}: {}", path.0, path.1.red());
         }
     }
 
