@@ -254,6 +254,9 @@ fn handle_git_state(options: &Options, log: &mut Log) -> Result<bool, Box<dyn Er
             return Ok(true);
         }
     } else if session.state == GitSessionState::Rebase {
+        // Update as much of the log as possible
+        update_log_while_rebasing(options, log)?;
+
         if session.unmerged_paths.is_empty() && !session.modified_paths.is_empty() {
             Git::cmd_passthru("rebase --continue".to_string(), &git_dir)?;
         }
@@ -715,7 +718,7 @@ pub fn cmd_rebase(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>
             .expect(format!("Failed to execute: {}\n", &query).as_str());
 
         if !status.success() {
-            println!("Rebase needs resolving");
+            println!("{}", "Rebase needs resolving".red());
         }
     }
 
@@ -736,6 +739,50 @@ pub fn cmd_rebase(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>
     cmd_update(&options, log)?;
 
     println!("\nRebase done");
+
+    Ok(())
+}
+
+// This functions will update log with hashes added during a rebase
+// It starts updating from the first commit and stops when the subjects no longer matches
+fn update_log_while_rebasing(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
+    let git_dir = options.git_dir.clone().unwrap();
+    let branch_point = options.branch_point.clone().unwrap();
+    let stdout = Git::cmd(format!("log --oneline --reverse --format='%H %s' {}..", branch_point), &git_dir)?;
+    let lines: Vec<&str> = stdout.split("\n").collect();
+    let commits = log.get_all()?;
+
+    let mut j: usize = 0;
+    for i in 0..commits.len() {
+
+        // Skip everything that is not a backported commit
+        if commits[i].1.len() != 40 && !commits[i].1.is_empty(){
+            continue;
+        }
+
+        // Gather info about commit in log
+        let commit = Git::show(&commits[i].0, &git_dir)?;
+        let hash_log = commit.hash;
+        let subject_log = commit.subject;
+
+        // Gather info about commit in repo
+        let mut cols: Vec<&str> = lines[j].split(" ").collect();
+        let hash_git = &cols.remove(0);
+        let subject_git = cols.join(" ");
+
+        // Compare them
+        if subject_git != subject_log {
+            // We've reached the commit currently being rebased
+            return Ok(())
+        }
+
+        // Update entry in log
+        j += 1;
+        if commits[i].1 != *hash_git {
+            print!("\rUpdating log: {}", subject_log);
+            log.commit_update(&hash_log, &hash_git)?;
+        }
+    }
 
     Ok(())
 }
