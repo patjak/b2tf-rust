@@ -874,7 +874,7 @@ pub fn cmd_prepend(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error
             continue;
         }
         let commit = Git::show(hash, &git_dir)?;
-        prepend.push_str(format!("# {}\n{}\n\n", commit.subject, commit.hash).as_str());
+        prepend.push_str(format!("# INSERTED: {}\n{}\n\n", commit.subject, commit.hash).as_str());
     }
 
     log.commits.insert_str(0, prepend.as_str());
@@ -904,7 +904,7 @@ pub fn cmd_append(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>
             continue;
         }
         let commit = Git::show(hash, &git_dir)?;
-        append.push_str(format!("# {}\n{}\n\n", commit.subject, commit.hash).as_str());
+        append.push_str(format!("# INSERTED: {}\n{}\n\n", commit.subject, commit.hash).as_str());
     }
 
     log.commits.push_str(append.as_str());
@@ -943,7 +943,7 @@ pub fn cmd_insert(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>
             continue;
         }
         let commit = Git::show(hash, &git_dir)?;
-        insert.push_str(format!("# {}\n{}\n\n", commit.subject, commit.hash).as_str());
+        insert.push_str(format!("# INSERTED: {}\n{}\n\n", commit.subject, commit.hash).as_str());
     }
 
     let mut commits = String::new();
