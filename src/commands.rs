@@ -411,6 +411,18 @@ fn find_conflict_lineno(file: String) -> Result<String, Box<dyn Error>> {
     Ok(lineno)
 }
 
+// Look in .git/rebase-merge/done for the last applied commit
+fn find_last_rebase_commit(options: &Options) -> Result<String, Box<dyn Error>> {
+    let git_dir = options.git_dir.clone().unwrap();
+    let path = format!("{}/.git/rebase-merge/done", git_dir);
+    let done = fs::read_to_string(path)?;
+    let rows: Vec<&str> = done.split("\n").collect();
+    let row = rows[rows.len() - 2];
+    let commit = row.split(" ").last().unwrap();
+
+    Ok(commit.to_string())
+}
+
 pub fn cmd_edit(options: &Options, log: &mut Log) -> Result<bool, Box<dyn Error>> {
     let git_dir = options.git_dir.clone().unwrap();
     let range_stop = options.range_stop.clone().unwrap();
@@ -451,7 +463,13 @@ pub fn cmd_edit(options: &Options, log: &mut Log) -> Result<bool, Box<dyn Error>
             let lineno = find_conflict_lineno(format!("{}/{}", git_dir, file))?;
 
             // Store the commit as a patch file
-            Git::cmd(format!("show {} > {}", commit, commit_file), &git_dir)?;
+            // If we are rebasing, the last/current commit is not found in the log
+            if session.state == GitSessionState::Rebase {
+                let rebase_commit = find_last_rebase_commit(options)?;
+                Git::cmd(format!("show {} > {}", rebase_commit, commit_file), &git_dir)?;
+            } else {
+                Git::cmd(format!("show {} > {}", commit, commit_file), &git_dir)?;
+            }
 
             // Store the target version of the file (eg git show v5.5:<filepath>)
             match Git::cmd(format!("show {}:{} > {}", range_stop, file, target_file), &git_dir) {
