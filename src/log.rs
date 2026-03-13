@@ -47,13 +47,16 @@ impl Log {
         let configs: Vec<&str> = self.config.split("\n").collect();
 
         for config in configs.iter() {
-            let config: Vec<&str> = config.split(":").collect();
-            if config.len() != 2 {
+            let mut config: Vec<&str> = config.split(":").collect();
+            if config.len() < 2 {
                 continue;
             }
 
             let name: &str = config[0].trim();
-            let value: &str = config[1].trim();
+
+            config.remove(0);
+            let value = config.join(":");
+            let value = value.trim();
 
             if name == "range-start" {
                 options.range_start = Some(value.to_string());
