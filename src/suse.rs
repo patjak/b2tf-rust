@@ -833,6 +833,9 @@ pub fn cmd_suse_apply(options: &Options) -> Result<(), Box<dyn Error>> {
     let paths = fs::read_dir(format!("{}/patches.suse/", kernel_source))?;
     for path in paths {
         let file_path = path?.path().display().to_string().clone();
+        if file_path.ends_with("~") {
+            continue;
+        }
         let git_commits = get_git_commits_from_patch(&file_path)?.clone();
         suse_paths.push((file_path, git_commits));
     }
