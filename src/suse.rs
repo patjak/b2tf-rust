@@ -495,7 +495,11 @@ fn series_remove(kernel_source: &String, file_name: &String) -> Result<bool, Box
 
     let lines: Vec<&str> = contents.split("\n").collect();
     for line in lines {
-        let patch = line.trim();
+        let cols: Vec<&str> = line.split("\t").collect();
+        if cols.len() != 2 {
+            continue;
+        }
+        let patch = cols[1].trim();
 
         if patch == format!("patches.suse/{}", file_name) {
             found = true;
@@ -503,6 +507,10 @@ fn series_remove(kernel_source: &String, file_name: &String) -> Result<bool, Box
         }
 
         output.push(line);
+    }
+
+    if !found {
+        return Err(format!("Failed to remove {} from series.conf", file_name).into());
     }
 
     let output = output.join("\n");
