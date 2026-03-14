@@ -580,9 +580,9 @@ fn suse_log(options: &Options, msg: &str) -> Result<(), Box<dyn Error>> {
 
     // If only series.conf is modified we are unguarding and scripts/log doesn't work
     if session.unmerged_paths.len() == 0 &&
-       session.unstaged_paths.len() == 0 &&
-       session.modified_paths.len() == 1 &&
-       session.modified_paths[0].1 == "series.conf" {
+       session.unstaged_paths.len() == 1 &&
+       session.modified_paths.len() == 0 &&
+       session.unstaged_paths[0].1 == "series.conf" {
         Git::cmd("add series.conf".to_string(), &kernel_source)?;
         Git::cmd(format!("commit --no-verify -m 'Remove guard from {}'", msg), &kernel_source)?;
         println!("Commited unguarding");
