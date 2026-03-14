@@ -477,7 +477,7 @@ fn sequence_patch(options: &Options, range_guard_commits: &Vec<String>, file_nam
                 continue;
             },
             "a" => {
-                series_remove(&kernel_source, file_name)?;
+                series_unstage(&kernel_source, file_name)?;
                 return Err("Aborted by user".red().into());
             },
             _ => (),
@@ -507,7 +507,7 @@ fn series_insert(kernel_source: &String, file_name: &String) -> Result<(), Box<d
     Ok(())
 }
 
-fn series_remove(kernel_source: &String, file_name: &String) -> Result<(), Box<dyn Error>> {
+fn series_unstage(kernel_source: &String, file_name: &String) -> Result<(), Box<dyn Error>> {
     let path = format!("patches.suse/{}", file_name);
     let query = format!("cd {} && git restore --staged {} && git restore series.conf && rm {}",
                         kernel_source, path, path);
@@ -515,13 +515,13 @@ fn series_remove(kernel_source: &String, file_name: &String) -> Result<(), Box<d
         .arg("-c")
         .arg(query)
         .output()
-        .expect("series remove failed");
+        .expect("series unstage failed");
 
     let stderr = String::from_utf8(output.stderr).expect("Invalid UTF8");
 
     if !output.status.success() {
         println!("{}", stderr);
-        return Err("series remove failed".red().into());
+        return Err("series unstage failed".red().into());
     }
 
     Ok(())
