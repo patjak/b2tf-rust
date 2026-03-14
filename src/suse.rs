@@ -313,6 +313,29 @@ fn copy_alt_commits(src: &String, dst: &String, kernel_source: &String) -> Resul
     Ok(())
 }
 
+// Remove the XXXX- number prefix from a patch filename
+// If there is a conflict, also add the commit hash at the end
+fn strip_number_prefix(old_file_name: &String, commit: &String) -> Result<String, Box<dyn Error>> {
+    let file_name = old_file_name.clone();
+    let mut file_name: Vec<&str> = file_name.split("-").collect();
+    let first = file_name.remove(0);
+    let _check_int = first.to_string().parse::<i32>()?;
+    let file_name = file_name.join("-");
+
+    let mut new_file_name = format!("{}", file_name);
+
+    if fs::exists(&new_file_name)? {
+        println!("File exists: {}", new_file_name);
+        new_file_name = format!("{}-{}", file_name, commit);
+        println!("Trying with: {}", new_file_name);
+    }
+
+    if fs::exists(&new_file_name)? {
+        return Err("Failed to strip number prefix from patch name. Stripped filename with hash already exists".into());
+    }
+    Ok(new_file_name)
+}
+
 fn copy_patch(src: &String, dst: &String, kernel_source: &String) -> Result<(), Box<dyn Error>> {
     // Always copy the references so they are never lost
     copy_references(dst, src, kernel_source)?;
@@ -898,6 +921,9 @@ pub fn cmd_suse_apply(options: &Options) -> Result<(), Box<dyn Error>> {
             continue;
         }
 
+        // Make sure we follow the SUSE patch filename convention
+        let commit = get_suse_tags(&file_path, &kernel_source, "Git-commit")?[0].clone();
+        let file_name = strip_number_prefix(&file_name.to_string(), &commit)?;
         let dst_path = format!("{}/patches.suse/{}", kernel_source, file_name);
 
         copy_patch(&file_path, &dst_path, &kernel_source)?;
