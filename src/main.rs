@@ -243,7 +243,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     } else if let Some(_matches) = matches.subcommand_matches("insert") {
         cmd_insert(&options, &mut log)?;
     } else if let Some(_matches) = matches.subcommand_matches("compare") {
-        cmd_compare(&options, &mut log)?;
+        cmd_compare(&options)?;
     } else if let Some(suse_matches) = matches.subcommand_matches("suse") {
         let subcommand = command.find_subcommand_mut("suse").unwrap();
         cmd_suse(&mut options, &log, subcommand, suse_matches)?;

@@ -189,7 +189,7 @@ fn compare_commits(options: &Options, hash1: &str, hash2: &str) -> Result<Compar
     Ok(res)
 }
 
-pub fn cmd_compare(options: &Options, log: &mut Log) -> Result<(), Box<dyn Error>> {
+pub fn cmd_compare(options: &Options) -> Result<(), Box<dyn Error>> {
     let p1 = options.patch1.clone().unwrap();
     let p1 = p1.as_str();
     let p2 = options.patch2.clone().unwrap();
