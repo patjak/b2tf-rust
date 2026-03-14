@@ -487,7 +487,37 @@ fn sequence_patch(options: &Options, range_guard_commits: &Vec<String>, file_nam
     Ok(())
 }
 
+fn series_remove(kernel_source: &String, file_name: &String) -> Result<bool, Box<dyn Error>> {
+    let file_path = format!("{}/series.conf", kernel_source);
+    let contents: String = fs::read_to_string(&file_path)?.parse()?;
+    let mut output: Vec<&str> = vec![];
+    let mut found = false;
+
+    let lines: Vec<&str> = contents.split("\n").collect();
+    for line in lines {
+        let patch = line.trim();
+
+        if patch == format!("patches.suse/{}", file_name) {
+            found = true;
+            continue;
+        }
+
+        output.push(line);
+    }
+
+    let output = output.join("\n");
+    fs::write(&file_path, output)?;
+
+    Ok(found)
+}
+
 fn series_insert(kernel_source: &String, file_name: &String) -> Result<(), Box<dyn Error>> {
+    // Sometimes a patch needs a new position in the sorted section because we/or they picked the alt-commit
+    // Fix this by always first removing the patch if it already exists
+    if series_remove(kernel_source, file_name)? {
+        println!("{}", "Reordering patch in series.conf".yellow());
+    }
+
     let path = format!("patches.suse/{}", file_name);
     let query = format!("cd {} && scripts/git_sort/series_insert {} && git add {}",
                         kernel_source, path, path);
