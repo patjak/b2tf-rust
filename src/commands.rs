@@ -445,7 +445,7 @@ pub fn cmd_edit(options: &Options, log: &mut Log) -> Result<bool, Box<dyn Error>
                 "n" => break,
                 "a" => return Err("Aborted by user".red().into()),
                 "v" => {
-                    let status = Command::new("sh")
+                    Command::new("sh")
                         .arg("-c")
                         .arg(format!("git -C {} show {}", git_dir, commit))
                         .status()
