@@ -591,8 +591,12 @@ fn suse_log(options: &Options, msg: &str) -> Result<(), Box<dyn Error>> {
        session.unstaged_paths.len() == 1 &&
        session.modified_paths.len() == 0 &&
        session.unstaged_paths[0].1 == "series.conf" {
+        // Make sure we get the correct path
+        let file_name = msg.split("/").collect::<Vec<&str>>().clone();
+        let file_name = file_name.last().unwrap();
+
         Git::cmd("add series.conf".to_string(), &kernel_source)?;
-        Git::cmd(format!("commit --no-verify -m 'Remove guard from {}'", msg), &kernel_source)?;
+        Git::cmd(format!("commit --no-verify -m 'Remove guard from patches.suse/{}'", file_name), &kernel_source)?;
         println!("Commited unguarding");
         return Ok(());
     }
