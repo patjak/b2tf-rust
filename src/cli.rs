@@ -159,6 +159,14 @@ impl Cli {
                                 .long("guard-prefix")
                             )
                     )
+                    .subcommand(
+                        Command::new("unguard")
+                            .about("reapply all guarded patches in series.conf")
+                            .arg(Arg::new("guard prefix")
+                                .help("Unguard all patches with this prefix")
+                                .long("guard-prefix")
+                            )
+                    )
             )
     }
 }

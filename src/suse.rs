@@ -4,7 +4,7 @@ use std::{fs, io};
 use std::path;
 use crate::Options;
 use crate::Log;
-use crate::git::Git;
+use crate::git::{Git, GitSessionState};
 use crate::Util;
 use crate::commands::*;
 use crate::patch::CompareResult;
@@ -43,6 +43,9 @@ pub fn cmd_suse(options: &mut Options, log: &Log, subcommand: &mut Command, matc
         },
         Some(("apply", _sub_m)) => {
             cmd_suse_apply(options)?;
+        },
+        Some(("unguard", _sub_m)) => {
+            cmd_suse_unguard(options)?;
         },
         Some((&_, _)) => {},
         None => {let _ = subcommand.print_help();},
@@ -949,6 +952,227 @@ pub fn cmd_suse_apply(options: &Options) -> Result<(), Box<dyn Error>> {
     }
 
     println!("\nDone");
+
+    Ok(())
+}
+
+// Returns a list of all guarded patches
+fn get_guards(options: &Options) -> Result<Vec<String>, Box<dyn Error>> {
+    let kernel_source = options.kernel_source.clone().unwrap();
+    let guard_prefix = format!("+{}", options.guard_prefix.clone().unwrap());
+    let series_path = format!("{}/series.conf", kernel_source);
+    let file = fs::read_to_string(&series_path)?;
+    let lines: Vec<&str> = file.split("\n").collect();
+
+    let mut list = Vec::new();
+
+    for line in lines {
+        let l = line.trim();
+        let cols: Vec<&str> = l.split("\t").collect();
+
+        if cols.len() == 2 && cols[0] == guard_prefix {
+            let path = cols[1].to_string();
+            list.push(path);
+        }
+    }
+
+    Ok(list)
+}
+
+fn sequence_test(kernel_source: &String) -> Result<String, Box<dyn Error>> {
+    let output = Cmd::new("sh")
+        .arg("-c")
+        .arg(format!("cd {} && scripts/sequence-patch.sh --dry --rapid", kernel_source))
+        .output()
+        .expect("Failed to sequence patches");
+
+    let stderr = String::from_utf8(output.stderr).expect("Invalid UTF8");
+
+    if output.status.success() {
+        return Ok("".to_string());
+    }
+
+    // Parse which patch failed to apply
+    let hunk: Vec<&str> = stderr.split("Patch ").collect();
+    let lines: Vec<&str> = hunk[1].split("\n").collect();
+    let cols: Vec<&str> = lines[0].split(" ").collect();
+    let failed_patch = cols[0];
+
+    Ok(failed_patch.to_string())
+}
+
+// Loop over failing patches after we've unguarded a patch
+fn sequence_unguard(options: &Options, path: &String) -> Result<(), Box<dyn Error>> {
+    let kernel_source = options.kernel_source.clone().unwrap();
+
+    loop {
+        let output = sequence_test(&kernel_source)?;
+        if output.is_empty() {
+            break;
+        } else {
+            println!("Sequencing failed with: {}", output.red());
+
+            let ask;
+
+            if *path != output {
+                ask = Util::ask("(R)etry, (g)uard, (s)kip, (a)bort: ".to_string(), vec!["r", "g", "s", "a"], "r");
+            } else  {
+                ask = Util::ask("(R)etry, (s)kip, (a)bort: ".to_string(), vec!["r", "s", "a"], "r");
+            }
+
+            match ask.as_str() {
+                "r" => {
+                    continue;
+                },
+                "g" => {
+                    insert_guard(options, output.as_str(), &vec![vec![]])?;
+                },
+                "s" => {
+                    Git::cmd("restore .".to_string(), &kernel_source)?;
+                    break;
+                },
+                "a" => {
+                    Git::cmd("restore .".to_string(), &kernel_source)?;
+                    return Err("Stopped by user".red().into());
+                },
+                _ => (),
+            }
+        }
+    }
+    Ok(())
+}
+
+fn handle_unguard(options: &Options, path: &String) -> Result<(), Box<dyn Error>> {
+    let work_dir = options.work_dir.clone().unwrap();
+    let kernel_source = options.kernel_source.clone().unwrap();
+    let git_dir = options.git_dir.clone().unwrap();
+    let signature = options.signature.clone().unwrap();
+    let references = options.references.clone().unwrap();
+
+    let commit = get_suse_tags(&path, &kernel_source, "Git-commit")?;
+    if commit.len() != 1 {
+        println!("Patch without Git-commit tag. Skipping: {}", path);
+        return Ok(());
+    }
+    let commit = &commit[0];
+    println!("Processing: {} {}", commit, path);
+
+    // Export the upstream version
+    let upstream_path = Git::cmd(format!("format-patch -o {}/unguards/ --no-renames --keep-subject {}~1..{}", work_dir, commit, commit), &git_dir)?;
+    let upstream_path = upstream_path.trim().to_string();
+
+    // Add Git-commit tag
+    add_suse_tag(&upstream_path, &kernel_source, "Git-commit", &commit)?;
+
+    // Add mainline tag
+    let mainline = get_mainline_tag(&commit, &git_dir)?;
+    add_suse_tag(&upstream_path, &kernel_source, "Patch-mainline", &mainline)?;
+
+    // Add Acked-by tag
+    add_suse_tag(&upstream_path, &kernel_source, "Acked-by", &signature)?;
+
+    // Add References tag
+    add_suse_tag(&upstream_path, &kernel_source, "References", &references)?;
+
+    // Compare patches to give user an idea of which one to pick
+    let downstream_path = format!("{}/{}", kernel_source, path);
+    let ret_comp = compare_patches(&upstream_path.as_str(), &downstream_path)?;
+    println!("Compared to upstream, patch is: {:?}", ret_comp);
+
+    // Unguard patch and check if it applies cleanly
+    let file_name = path.split("/").collect::<Vec<&str>>().clone();
+    let file_name = file_name.last().unwrap();
+
+    remove_guard(options, &file_name)?;
+    series_insert(&kernel_source, &file_name.to_string())?;
+
+    let output = sequence_test(&kernel_source)?;
+    if output.is_empty() {
+        println!("{}", "Current version applies cleanly".green());
+    } else {
+        println!("{} {}", "Current version failes to apply in:".red(), output);
+    }
+
+    // Copy the upstream version into kernel-source to see if it applies
+    copy_patch(&upstream_path, &downstream_path, &kernel_source)?;
+
+    let output = sequence_test(&kernel_source)?;
+    if output.is_empty() {
+        println!("{}", "Upstream version applies cleanly".green());
+    } else {
+        println!("{} {}", "Upstream version failes to apply in: ".red(), output);
+    }
+
+    // Restore state
+    Git::cmd("restore .".to_string(), &kernel_source)?;
+
+    loop {
+        let ask = Util::ask("(K)eep current, (r)eplace with upstream, (v)iew, (s)kip, (a)bort: ".to_string(),
+                            vec!["k", "r", "v", "s", "a"], "k");
+
+        // FIXME: Support other editors
+        match ask.as_str() {
+            "k" => {
+                remove_guard(options, &file_name)?;
+                series_insert(&kernel_source, &file_name.to_string())?;
+                sequence_unguard(options, path)?;
+                suse_log(options, file_name)?;
+                break;
+            },
+            "r" => {
+                remove_guard(options, &file_name)?;
+                series_insert(&kernel_source, &file_name.to_string())?;
+                copy_patch(&upstream_path, &downstream_path, &kernel_source)?;
+
+                sequence_unguard(options, path)?;
+                suse_log(options, file_name)?;
+
+                break;
+            },
+            "v" => {
+                let mut query = format!("diff -Naur {} {} > /tmp/{} || vim -O {} {} /tmp/{} && rm /tmp/{}",
+                                        downstream_path, upstream_path, file_name, downstream_path, upstream_path, file_name, file_name);
+                if ret_comp == CompareResult::Identical {
+                    query = format!("vim {}", downstream_path);
+                }
+
+                Cmd::new("sh")
+                    .arg("-c")
+                    .arg(query)
+                    .status()
+                    .expect("Failed to show diff");
+            },
+            "s" => {
+                break;
+            },
+            "a" => {
+                Git::cmd("restore .".to_string(), &kernel_source)?;
+                return Err("Stopped by user".red().into());
+            },
+            _ => (),
+        };
+    }
+
+    Ok(())
+}
+
+pub fn cmd_suse_unguard(options: &Options) -> Result<(), Box<dyn Error>> {
+    let kernel_source = options.kernel_source.clone().unwrap();
+    let session = Git::get_session(&kernel_source)?;
+
+    if session.state != GitSessionState::None {
+        return Err("Invalid session state".into());
+    }
+
+    let paths = get_guards(options)?;
+    let num = paths.len();
+    let mut i = 1;
+
+    for path in paths {
+        println!("Progress: {}/{}", i, num);
+        handle_unguard(options, &path)?;
+        i += 1;
+    }
 
     Ok(())
 }
